@@ -246,6 +246,19 @@
     return r;
   }
 
+  // Diâmetro do furo i, numa posição fixa, para que soe o alvo.
+  // Furo maior → nota mais aguda; por isso a bisseção usa a frequência com sinal trocado.
+  function resolverDiametro(geo, i, alvo, gas, dMin, dMax) {
+    const furos = geo.furos.map((h) => ({ ...h }));
+    const freq = (d) => {
+      furos[i].diam = d;
+      return ressonancia({ ...geo, furos }, i + 1, gas, alvo);
+    };
+    const r = bissecao((d) => -freq(d), -alvo, dMin, dMax);
+    if (r.fora) r.fora = r.fora === 'alto' ? 'pequeno' : 'grande';
+    return r;
+  }
+
   // Correção da embocadura (deltaEmb, mm) para o modelo bater com uma medição real.
   function calibrarEmbocadura(geo, nAbertos, fMedida, gas) {
     const freq = (d) => ressonancia({ ...geo, deltaEmb: d }, nAbertos, gas, fMedida);
@@ -256,7 +269,7 @@
   global.Acustica = {
     NOMES, GRAUS, ESCALA_MAIOR, AFINACOES,
     freqMidi, nomeMidi, cents, alvos, ar, diametroEm,
-    impedanciaJato, ressonancia, resolverComprimento, resolverFuro, calibrarEmbocadura,
+    impedanciaJato, ressonancia, resolverComprimento, resolverFuro, resolverDiametro, calibrarEmbocadura,
     _setCorrecaoLabio(v) { CORRECAO_LABIO = v; },
   };
 })(typeof window !== 'undefined' ? window : globalThis);

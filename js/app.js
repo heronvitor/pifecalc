@@ -4,6 +4,8 @@
   const A = window.Acustica;
   const CHAVE = 'pifano.v1';
   const VAO_MAX_DEDOS = 35; // mm entre furos vizinhos da mesma mão
+  const VAO_MIN = 18; // mm mínimos entre centros de furos vizinhos (ex.: furos 2 e 3, um semitom)
+  const DIAM_MIN = 5; // mm: furo menor que isso soa fraco e instável
   const TEMPERATURA = 30; // °C do ar dentro do pífano enquanto se toca
 
   // ---------- utilidades ----------
@@ -150,7 +152,8 @@
           }
         }
         geo.furos[i].pos = r.x;
-        info[i] = { fora: r.fora, erro };
+        info[i] = { fora: r.fora, erro, alvoModelo, afastado: info[i].afastado }; // afastado vem da 1ª volta
+        if (i > 0 && r.fora !== 'alto') afastar(p, geo, info, i, gas, dMax);
       }
     }
 
@@ -168,6 +171,47 @@
     pl.margem = Math.max(10, 0.03 * geo.comprimento);
     pl.gomo = geo.rolha + geo.comprimento + pl.margem;
     return pl;
+  }
+
+  /*
+   * Se o furo i ficou perto demais do furo de baixo (i-1), afasta os dois:
+   * o de baixo desce (e cresce) e o de cima sobe (e diminui), recalculando
+   * o diâmetro de cada um para manter a nota. Furos já feitos ou com
+   * diâmetro escolhido pelo usuário não são alterados.
+   */
+  function afastar(p, geo, info, i, gas, dMax) {
+    const baixo = geo.furos[i - 1], cima = geo.furos[i];
+    const falta = VAO_MIN - (baixo.pos - cima.pos);
+    if (falta <= 0.5) return;
+    const mexeBaixo = !p.furos[i - 1].feito && !p.furos[i - 1].diamPlan;
+    const mexeCima = !p.furos[i].diamPlan;
+
+    const ajustar = (k, pos, alvo) => {
+      geo.furos[k].pos = pos;
+      const d = A.resolverDiametro(geo, k, alvo, gas, DIAM_MIN, dMax);
+      geo.furos[k].diam = arred05(d.x);
+      // reposiciona para o diâmetro arredondado (mantém a nota exata)
+      const r = A.resolverFuro(geo, k, alvo, gas);
+      geo.furos[k].pos = r.x;
+      info[k].fora = r.fora;
+    };
+
+    if (mexeBaixo) {
+      const desce = mexeCima ? falta / 2 : falta;
+      // não pode encostar no furo de baixo dele (ou sair do tubo)
+      const limite = i >= 2
+        ? geo.furos[i - 2].pos - VAO_MIN
+        : geo.comprimento - baixo.diam - 3;
+      const nova = Math.min(baixo.pos + desce, Math.max(baixo.pos, limite));
+      if (nova > baixo.pos + 0.2) {
+        ajustar(i - 1, nova, info[i - 1].alvoModelo);
+        info[i - 1].afastado = i + 1;
+      }
+    }
+    if (mexeCima && baixo.pos - cima.pos < VAO_MIN - 0.5) {
+      ajustar(i, baixo.pos - VAO_MIN, info[i].alvoModelo);
+      info[i].afastado = i;
+    }
   }
 
   function previsoes(pl) {
@@ -430,7 +474,9 @@
           posInfo: partes.join(' · '),
           diam: mm(diam, 1),
           broca: h.feito ? '' : `Comece com ${mm(broca, 1)}.`,
-          avisos: avisos.map((a) => `<p class="aviso">${a}</p>`).join(''),
+          avisos: (inf.afastado && !h.feito
+            ? `<p class="ajuda">Diâmetro ajustado para manter pelo menos ${VAO_MIN} mm entre os furos ${Math.min(i + 1, inf.afastado)} e ${Math.max(i + 1, inf.afastado)}.</p>`
+            : '') + avisos.map((a) => `<p class="aviso">${a}</p>`).join(''),
           alvo: `${nomeGrau(pl, i + 1)} ${sinal(desvio)}¢ · ${hz(alvo)}`,
           alvoInfo,
           feitoInfo: `Furo a ${mm(h.pos, 1)} com ${mm(h.diam, 1)}. Diferença do modelo: ${sinal(h.erro)} cents.`,
