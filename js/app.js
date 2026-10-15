@@ -399,9 +399,10 @@
           <label class="campo"><span>Frequência medida (Hz) — opcional; sem ela, vale o alvo</span>
             <span class="com-botao"><input inputmode="decimal" data-c="furo.fMedida" data-i="${i}" value="${valor(h.fMedida)}" ${trava}>
             <button type="button" class="secundario" data-acao="lerAfinador" ${trava}>Ler</button></span></label>
-          <label class="campo" style="display:flex;gap:8px;align-items:center">
-            <input type="checkbox" data-c="corrigir" ${p.corrigir ? 'checked' : ''} style="width:auto;min-height:0">
-            <span style="margin:0">Corrigir os próximos furos pela diferença medida neste</span></label>
+          <label class="toggle">
+            <span>Corrigir os próximos furos pela diferença medida neste</span>
+            <input type="checkbox" data-c="corrigir" ${p.corrigir ? 'checked' : ''}>
+            <span class="toggle-track"></span></label>
           ${h.feito
             ? `<p class="ok" data-s="feitoInfo"></p><button type="button" class="secundario largo" data-acao="furoRefazer">Alterar furo ${i + 1}</button>`
             : `<button type="button" class="largo" data-acao="furoConfirmar">Confirmar furo ${i + 1}</button>`}`;
@@ -461,7 +462,7 @@
       saidas(p, pl) {
         if (pl.falhou) return { tabNotas: '—', tabMedidas: '—' };
         const prev = previsoes(pl);
-        const cor = (c) => (Math.abs(c) <= 5 ? 'ok' : Math.abs(c) <= 15 ? '' : 'aviso');
+        const cor = (c) => (Math.abs(c) <= 5 ? 'c-ok' : Math.abs(c) <= 15 ? 'c-perto' : 'c-longe');
         const notas = prev.map((r, k) => {
           const d1 = A.cents(r.f1, r.alvo), d2 = A.cents(r.f2, 2 * r.f1);
           return `<tr><td>${A.GRAUS[k]} ${nomeGrau(pl, k)}</td><td>${fmt(r.alvo, 1)}</td><td>${fmt(r.f1, 1)}</td>
