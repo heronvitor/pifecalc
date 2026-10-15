@@ -19,6 +19,7 @@
           <button type="button" data-acao="renomear">Renomear</button>
           <button type="button" data-acao="exportar">Exportar (arquivo)</button>
           <button type="button" data-acao="importar">Importar arquivo</button>
+          <button type="button" data-acao="imprimir">Imprimir gabarito</button>
           <button type="button" data-acao="apagar" class="perigo">Apagar este pífano</button>
         </div>
       </details>
@@ -64,6 +65,8 @@
   </div>
 
   <input type="file" id="arquivo" accept="application/json,.json" hidden>
+
+  <section id="impressao" aria-hidden="true"></section>
 
   <script src="js/acustica.js"></script>
   <script src="js/afinador.js"></script>

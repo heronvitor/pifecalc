@@ -385,3 +385,46 @@ td.c-longe { color: var(--vermelho); font-weight: 600; }
 .t-atual { fill: var(--laranja); stroke: var(--laranja); stroke-width: 1; }
 .t-rotulo { fill: var(--suave); font-size: 14px; text-anchor: middle; font-family: 'Segoe UI', system-ui, sans-serif; }
 .t-rotulo-atual { fill: var(--laranja); font-weight: 700; }
+
+/* ---------- gabarito para impressão ---------- */
+#impressao { display: none; }
+
+@page { size: A4 portrait; margin: 12mm; }
+
+@media print {
+  body { background: white; }
+  body > *:not(#impressao) { display: none !important; }
+  #impressao { display: block; color: black; font: 10pt/1.35 'Segoe UI', system-ui, sans-serif; }
+  #impressao h1 { font-size: 15pt; margin: 0 0 2mm; }
+  .g-info { margin: 0 0 3mm; font-size: 9pt; }
+  .g-conferir { display: flex; align-items: center; gap: 4mm; margin: 0 0 3mm; font-size: 8.5pt; }
+  .g-conferir svg { flex: 0 0 auto; }
+  .g-instrucoes { margin: 0 0 3mm; padding-left: 5mm; font-size: 8.5pt; }
+  .g-pequeno-p { font-size: 8pt; margin: 1mm 0 2mm; color: #333; }
+  .g-linha { break-inside: avoid; margin: 0 0 4mm; }
+  .g-rotulo { font-size: 8pt; color: #333; margin-bottom: 0.5mm; }
+  svg.faixa { display: block; overflow: visible; border: 0.2mm dashed #888; }
+  .g-tabelas { display: flex; gap: 6mm; align-items: flex-start; break-inside: avoid; margin-top: 2mm; }
+  .g-tabelas table { width: auto; flex: 1; font-size: 8.5pt; }
+  .g-tabelas th, .g-tabelas td { padding: 1mm 1.5mm; border-bottom: 0.2mm solid #bbb; }
+  .g-tabelas .dedilhado { margin: 0; }
+  .g-tabelas .dedilhado i { border-color: black; }
+  .g-tabelas .dedilhado i.fechado { background: black; }
+  * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}
+
+/* elementos do SVG do gabarito (unidades em mm) */
+.g-tubo { fill: #fbf3d9; stroke: #333; stroke-width: 0.25; }
+.g-centro { stroke: #555; stroke-width: 0.2; stroke-dasharray: 2 1; }
+.g-regua { stroke: black; stroke-width: 0.15; }
+.g-barra { fill: black; }
+.g-no { fill: #9b8a5a; }
+.g-cola { fill: #9a9a9a; fill-opacity: 0.35; }
+.g-furo { fill: #333; fill-opacity: 0.25; stroke: black; stroke-width: 0.3; }
+.g-furo.g-plano { fill: none; stroke-dasharray: 1 0.6; }
+.g-cruz { stroke: black; stroke-width: 0.2; }
+.g-pe { stroke: black; stroke-width: 0.6; }
+.g-corte { stroke: black; stroke-width: 0.4; stroke-dasharray: 1.5 1; }
+.g-txt { font: 2.8px 'Segoe UI', system-ui, sans-serif; text-anchor: middle; fill: black; }
+.g-pequeno { font-size: 2.2px; }
+.g-forte { font-weight: 700; font-size: 3.4px; }

@@ -449,6 +449,7 @@
           <p class="ajuda">Previsão do modelo com as medidas registradas (furos ainda não feitos entram pelo plano). “2ª oit.” é o desvio da oitava de cima em relação ao dobro da nota de baixo.</p>
           <h3>Medidas</h3>
           <div class="tabela-rolagem" data-s="tabMedidas"></div>
+          <button type="button" class="largo" data-acao="imprimir">Imprimir gabarito em tamanho real</button>
           <button type="button" class="secundario largo" data-acao="exportar">Exportar arquivo deste pífano</button>`;
       },
       saidas(p, pl) {
@@ -513,6 +514,115 @@
     el.innerHTML = svg + `<p class="legenda">Comprimento em escala, espessura ampliada 2× · do nó ao pé: ${mm(g.rolha + L)} · furos numerados a partir do pé</p>`;
   }
   const fmt2 = (v) => (Math.round(v * 10) / 10).toString();
+
+  // ---------- gabarito para impressão ----------
+  // Tudo em milímetros reais: o SVG usa width/height em mm e viewBox em mm.
+  const FAIXA = 180; // comprimento útil de cada faixa numa folha A4 em pé
+  const SOBRA = 10; // trecho repetido no início da faixa seguinte, para colar
+
+  function svgFaixa(g, a, b, k, total, extras) {
+    const w = b - a, H = 34, yc = 19, rT = 8;
+    let s = `<svg class="faixa" width="${fmt2(w)}mm" height="${H}mm" viewBox="${fmt2(a)} 0 ${fmt2(w)} ${H}" xmlns="http://www.w3.org/2000/svg">`;
+    // corpo do tubo e linha de centro
+    const xNo = -g.rolha;
+    const xi = Math.max(a, xNo - 5), xf = Math.min(b, extras.fimTubo);
+    if (xf > xi) s += `<rect x="${fmt2(xi)}" y="${yc - rT}" width="${fmt2(xf - xi)}" height="${2 * rT}" class="g-tubo"/>`;
+    s += `<line x1="${fmt2(a)}" y1="${yc}" x2="${fmt2(b)}" y2="${yc}" class="g-centro"/>`;
+    // área de colagem (repete o fim da faixa anterior)
+    if (k > 0) {
+      s += `<rect x="${fmt2(a)}" y="${yc - rT}" width="${SOBRA}" height="${2 * rT}" class="g-cola"/>`;
+      s += `<text x="${fmt2(a + SOBRA / 2)}" y="${yc}" transform="rotate(-90 ${fmt2(a + SOBRA / 2)} ${yc})" dominant-baseline="central" class="g-txt g-pequeno">colar</text>`;
+    }
+    // régua: marcas a cada mm, rótulo a cada cm (distância da embocadura)
+    for (let x = Math.ceil(a); x <= b; x++) {
+      const t = x % 10 === 0 ? 4 : x % 5 === 0 ? 2.6 : 1.5;
+      s += `<line x1="${x}" y1="0" x2="${x}" y2="${t}" class="g-regua"/>`;
+      if (x % 10 === 0 && x - a > 2 && b - x > 2) s += `<text x="${x}" y="7" class="g-txt g-pequeno">${x / 10}</text>`;
+    }
+    // nó / rolha
+    if (xNo >= a - 5 && xNo <= b) {
+      s += `<rect x="${fmt2(xNo - 5)}" y="${yc - rT}" width="5" height="${2 * rT}" class="g-no"/>`;
+      s += `<text x="${fmt2(xNo - 2.5)}" y="${H - 1.2}" class="g-txt">nó</text>`;
+    }
+    // embocadura e furos: círculo no diâmetro final + cruz no centro
+    const marca = (x, d, rotulo, plano) => {
+      if (x - d / 2 < a || x + d / 2 > b) return ''; // só marcas inteiras nesta faixa
+      const r = d / 2, c = r + 2.5;
+      return `<circle cx="${fmt2(x)}" cy="${yc}" r="${fmt2(r)}" class="g-furo${plano ? ' g-plano' : ''}"/>`
+        + `<line x1="${fmt2(x - c)}" y1="${yc}" x2="${fmt2(x + c)}" y2="${yc}" class="g-cruz"/>`
+        + `<line x1="${fmt2(x)}" y1="${fmt2(yc - c)}" x2="${fmt2(x)}" y2="${fmt2(yc + c)}" class="g-cruz"/>`
+        + `<text x="${fmt2(x)}" y="${H - 1.2}" class="g-txt g-forte">${rotulo}</text>`;
+    };
+    s += marca(0, g.embDiam, 'E', false);
+    g.furos.forEach((f, i) => { s += marca(f.pos, f.diam, String(i + 1), !extras.feitos[i]); });
+    // pé (e primeiro corte, se o comprimento ainda não foi confirmado)
+    const corte = (x, rotulo, classe) => (x >= a && x <= b
+      ? `<line x1="${fmt2(x)}" y1="${yc - rT - 2}" x2="${fmt2(x)}" y2="${yc + rT + 2}" class="${classe}"/><text x="${fmt2(x)}" y="${H - 1.2}" class="g-txt">${rotulo}</text>`
+      : '');
+    s += corte(g.comprimento, 'pé', 'g-pe');
+    if (extras.primeiroCorte) s += corte(extras.primeiroCorte, '1º corte', 'g-corte');
+    s += '</svg>';
+    return `<div class="g-linha"><div class="g-rotulo">Faixa ${k + 1} de ${total}</div>${s}</div>`;
+  }
+
+  function montarImpressao() {
+    const p = proj(), pl = plano();
+    if (pl.falhou) { alert('Não foi possível calcular este pífano. Confira o tom e o bambu.'); return false; }
+    const g = pl.geo;
+    const primeiroCorte = p.compFeito ? null : g.comprimento + pl.margem;
+    const fimTubo = primeiroCorte || g.comprimento;
+    const ini = -g.rolha - 8, fim = fimTubo + 6;
+    // Emendas (trecho de colagem) não podem cair sobre a embocadura, um furo ou o pé.
+    const marcas = [{ x: 0, r: g.embDiam / 2 }, { x: g.comprimento, r: 0 }, ...g.furos.map((f) => ({ x: f.pos, r: f.diam / 2 }))];
+    if (primeiroCorte) marcas.push({ x: primeiroCorte, r: 0 });
+    const livre = (x) => marcas.every((m) => m.x + m.r + 3 < x || m.x - m.r - 3 > x + SOBRA);
+    const trechos = [];
+    let a = ini;
+    while (true) {
+      const b = Math.min(a + FAIXA, fim);
+      trechos.push([a, b]);
+      if (b >= fim) break;
+      let prox = b - SOBRA;
+      for (let recuo = 0; recuo < 60 && !livre(prox); recuo++) prox -= 1;
+      trechos[trechos.length - 1][1] = prox + SOBRA; // a faixa acaba no fim da área de colagem
+      a = prox;
+    }
+    const extras = { fimTubo, primeiroCorte, feitos: p.furos.map((h) => h.feito) };
+    const faixas = trechos.map(([a, b], k) => svgFaixa(g, a, b, k, trechos.length, extras)).join('');
+
+    const linhaMedida = (nome, x, d, ok) => `<tr><td>${nome}</td><td>${fmt(x, 1)}</td><td>${fmt(g.comprimento - x, 1)}</td><td>${fmt(d, 1)}</td><td>${ok ? 'feito' : 'previsto'}</td></tr>`;
+    const medidas = [
+      linhaMedida('Embocadura', 0, g.embDiam, p.embFeito),
+      ...[5, 4, 3, 2, 1, 0].map((i) => linhaMedida(`Furo ${i + 1}`, g.furos[i].pos, g.furos[i].diam, p.furos[i].feito)),
+      `<tr><td>Pé</td><td>${fmt(g.comprimento, 1)}</td><td>0</td><td>${fmt(g.dPe, 1)} (int.)</td><td>${p.compFeito ? 'feito' : 'previsto'}</td></tr>`,
+    ].join('');
+    const notas = pl.alvos.map((f, k) => `<tr><td>${A.GRAUS[k]}</td><td>${nomeGrau(pl, k)}</td><td>${fmt(f, 1)}</td><td>${dedilhado(k, true)}</td></tr>`).join('');
+
+    const regua10 = (() => {
+      let r = '<svg width="100mm" height="8mm" viewBox="0 0 100 8" xmlns="http://www.w3.org/2000/svg"><rect x="0" y="3" width="100" height="2" class="g-barra"/>';
+      for (let x = 0; x <= 100; x += 10) r += `<line x1="${x}" y1="0" x2="${x}" y2="8" class="g-regua"/>`;
+      return r + '</svg>';
+    })();
+
+    const tom = `${nomeGrau(pl, 0)} (${fmt(pl.alvos[0], 1)} Hz, Lá4 = ${fmt(p.la4 || 440)} Hz)`;
+    $('#impressao').innerHTML = `
+      <h1>${esc(p.nome)} — gabarito</h1>
+      <p class="g-info">Tônica ${tom} · bambu ${g.dTopo === g.dPe ? fmt(g.dTopo, 1) : `${fmt(g.dTopo, 1)} → ${fmt(g.dPe, 1)}`} mm interno, parede ${fmt(g.parede, 1)} mm · ${new Date().toLocaleDateString('pt-BR')}</p>
+      <div class="g-conferir">${regua10}<span>Esta barra deve medir exatamente <b>10 cm</b>. Se não medir, imprima de novo em <b>tamanho real (escala 100%)</b>, sem “ajustar à página”.</span></div>
+      <ol class="g-instrucoes">
+        <li>Recorte as faixas e emende em ordem, colando o início de cada faixa (área cinza) sobre o fim da anterior, com as marcas da régua coincidindo.</li>
+        <li>Prenda o gabarito sobre a linha reta do bambu, com o centro da marca <b>E</b> sobre o centro da embocadura.</li>
+        <li>Marque o centro de cada furo pela cruz. Círculo cheio = furo já feito; tracejado = previsto (fure menor e afine).</li>
+      </ol>
+      <p class="g-pequeno-p">Régua em centímetros a partir do centro da embocadura.</p>
+      ${faixas}
+      <div class="g-tabelas">
+        <table><thead><tr><th></th><th>da emb.</th><th>do pé</th><th>diâm.</th><th></th></tr></thead><tbody>${medidas}</tbody></table>
+        <table><thead><tr><th>Grau</th><th>Nota</th><th>Hz</th><th>Dedilhado</th></tr></thead><tbody>${notas}</tbody></table>
+      </div>
+      <p class="g-pequeno-p">Medidas em mm. Centro da embocadura a ${mm(g.rolha)} da face interna do nó (ou rolha).${p.compFeito ? '' : ` Comprimento ainda não confirmado: corte primeiro na marca “1º corte” e afine encurtando até o “pé”.`}</p>`;
+    return true;
+  }
 
   // ---------- montagem da página ----------
   function renderProjetos() {
@@ -685,6 +795,7 @@
       setTimeout(() => URL.revokeObjectURL(a.href), 1000);
     },
     importar() { $('#arquivo').click(); },
+    imprimir() { if (montarImpressao()) window.print(); },
   };
 
   $('#arquivo').addEventListener('change', async (e) => {
