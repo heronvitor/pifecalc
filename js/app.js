@@ -49,6 +49,9 @@
     const base = novoProjeto();
     const p = Object.assign(base, dados);
     p.furos = base.furos.map((h, i) => Object.assign(h, (dados.furos || [])[i]));
+    // Embocaduras feitas com a sugestão antiga (1 diâmetro do nó) e sem a
+    // distância registrada: fixa o valor para o plano não mudar sozinho.
+    if (p.embFeito && p.rolha == null) p.rolha = Math.round(geometriaPadrao(p).dTopo);
     return p;
   }
 
@@ -105,15 +108,22 @@
     return cache.plano;
   }
 
-  function calcular(p) {
+  function geometriaPadrao(p) {
     const gas = A.ar(TEMPERATURA);
     const midi = (p.oitava + 1) * 12 + p.nota;
     const alvos = A.alvos({ midi, la4: p.la4 || 440, desvios: p.desvios });
     const meiaOnda = gas.c / (2 * alvos[0]) * 1000;
-    const faixa = [meiaOnda / 32, meiaOnda / 22];
     const dTopo = p.dTopo || arred05(meiaOnda / 26);
+    return { gas, midi, alvos, meiaOnda, dTopo };
+  }
+
+  function calcular(p) {
+    const { gas, midi, alvos, meiaOnda, dTopo } = geometriaPadrao(p);
+    const faixa = [meiaOnda / 32, meiaOnda / 22];
     const dPe = p.dPe || dTopo;
-    const sug = { rolha: Math.round(dTopo), emb: arred05(0.6 * dTopo) };
+    // Embocadura a 2 diâmetros do nó: longe da parte irregular perto do nó;
+    // a câmara maior baixa um pouco a 2ª oitava, que tende a sair alta.
+    const sug = { rolha: Math.round(2 * dTopo), emb: arred05(0.6 * dTopo) };
     const geo = {
       dTopo, dPe,
       parede: p.parede || 3,
@@ -326,7 +336,7 @@
           <h2>Embocadura</h2>
           <div class="cartao">
             <p>Centro da embocadura a</p><p class="grande" data-s="rolhaSug"></p>
-            <p>da face interna do nó (ou da rolha).</p>
+            <p>da face interna do nó (ou da rolha): 2 diâmetros internos, longe da parte irregular perto do nó.</p>
           </div>
           <div class="cartao">
             <p>Diâmetro final sugerido</p><p class="grande" data-s="embSug"></p>
@@ -759,7 +769,12 @@
   }
 
   const ACOES = {
-    embFeita() { proj().embFeito = true; salvar(); renderPasso(); },
+    embFeita() {
+      const p = proj(), sug = plano().sug;
+      if (p.rolha == null) p.rolha = sug.rolha;
+      if (p.embDiam == null) p.embDiam = sug.emb;
+      p.embFeito = true; salvar(); renderPasso();
+    },
     embRefazer() { proj().embFeito = false; salvar(); renderPasso(); },
 
     compConfirmar() {
