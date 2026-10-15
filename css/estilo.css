@@ -14,44 +14,7 @@
   --bambu-borda: #8a7740;
   --furo-feito: #2b2b22;
   --raio: 10px;
-  color-scheme: light;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --fundo: #161712;
-    --superficie: #20221b;
-    --texto: #ecebe4;
-    --suave: #a4a698;
-    --borda: #3a3c31;
-    --acento: #9cc27a;
-    --acento-texto: #142008;
-    --destaque: #e59a4e;
-    --bom: #7bc47f;
-    --alerta: #f0b04a;
-    --erro: #f2867e;
-    --bambu: #6e6237;
-    --bambu-borda: #b9a466;
-    --furo-feito: #0d0d0a;
-    color-scheme: dark;
-  }
-}
-:root[data-theme="dark"] {
-  --fundo: #161712;
-  --superficie: #20221b;
-  --texto: #ecebe4;
-  --suave: #a4a698;
-  --borda: #3a3c31;
-  --acento: #9cc27a;
-  --acento-texto: #142008;
-  --destaque: #e59a4e;
-  --bom: #7bc47f;
-  --alerta: #f0b04a;
-  --erro: #f2867e;
-  --bambu: #6e6237;
-  --bambu-borda: #b9a466;
-  --furo-feito: #0d0d0a;
-  color-scheme: dark;
+  color-scheme: only light;
 }
 
 * { box-sizing: border-box; }
