@@ -372,6 +372,33 @@ td.c-longe { color: var(--vermelho); font-weight: 600; }
   font-size: 0.7rem;
   color: var(--suave);
 }
+.faixa { position: relative; height: 44px; margin: 6px 4px 0; }
+.faixa-trilho { position: absolute; left: 0; right: 0; top: 10px; height: 12px; border-radius: 6px; background: var(--linha); }
+.faixa-cheia {
+  position: absolute;
+  top: 10px;
+  height: 12px;
+  border-radius: 6px;
+  background: var(--azul);
+  opacity: 0;
+  transition: left 0.15s, width 0.15s;
+}
+.faixa-meio {
+  position: absolute;
+  top: 2px;
+  width: 4px;
+  height: 28px;
+  border-radius: 2px;
+  background: var(--laranja);
+  transform: translateX(-2px);
+  opacity: 0;
+  transition: left 0.15s;
+}
+.af-faixa-txt { text-align: center; margin: 4px 0 0; font-size: 0.95rem; font-variant-numeric: tabular-nums; min-height: 2.6em; color: var(--suave); }
+.af-faixa-txt b { font-size: 1.15rem; }
+.af-faixa-txt.afinado b { color: var(--verde); }
+.af-faixa-txt.perto b { color: var(--laranja); }
+.af-faixa-txt.longe b { color: var(--vermelho); }
 .af-botoes { display: grid; gap: 8px; margin-top: 10px; }
 .af-msg { font-size: 0.85rem; color: var(--suave); margin: 8px 0 0; min-height: 1.2em; }
 

@@ -375,7 +375,7 @@
             <p>Com o tubo ainda sem furos, afine em</p><p class="grande" data-s="alvoComp"></p>
             <p class="ajuda" data-s="alvoCompInfo"></p>
           </div>
-          <p class="ajuda">Sopre com a força normal de tocar. Se estiver baixo, encurte o pé 1 a 2 mm por vez (ou lixe). Pare um pouco antes do alvo: encurtar não tem volta.</p>
+          <p class="ajuda">No afinador, faça a nota o mais grave e o mais aguda possível (mudando sopro e embocadura) e use o <b>centro da faixa</b>. Se estiver baixo, encurte o pé 1 a 2 mm por vez (ou lixe). Pare um pouco antes do alvo: encurtar não tem volta.</p>
           <h3>Como ficou</h3>
           <label class="campo"><span>Comprimento final, do centro da embocadura ao pé (mm)</span>
             <input inputmode="decimal" data-c="comprimento" value="${valor(p.comprimento)}" ${trava}></label>
@@ -425,7 +425,7 @@
           <details class="mais"><summary>Como afinar o furo</summary>
             <ul>
               <li>Fure com broca (ou ferro quente) menor que o previsto, no ponto marcado sobre a linha.</li>
-              <li>Alargue aos poucos e confira no afinador: furo maior → nota mais aguda.</li>
+              <li>Alargue aos poucos e confira o centro da faixa no afinador: furo maior → nota mais aguda.</li>
               <li>Chegou ao diâmetro previsto e ainda está baixo? Alargue puxando para o lado da embocadura.</li>
               <li>Passou do ponto? Um pouco de cera na borda do lado da embocadura baixa a nota.</li>
             </ul>
@@ -900,9 +900,48 @@
     return null;
   }
 
+  // Faixa de sopro: cents das leituras estáveis em relação à referência,
+  // do mais grave ao mais agudo (sopro e embocadura). O centro é o que se compara ao alvo.
+  const FAIXA_LIM = 150; // ¢ — além disso é oitava, harmônico ou outra nota
+  const FAIXA_ESC = 100; // ¢ — meia largura da barra
+  const faixa = { ref: null, comAlvo: false, cents: [] };
+
+  function percentil(v, q) {
+    const s = [...v].sort((a, b) => a - b);
+    return s[Math.min(s.length - 1, Math.max(0, Math.round(q * (s.length - 1))))];
+  }
+
+  function zerarFaixa(ref = null, comAlvo = false) {
+    faixa.ref = ref;
+    faixa.comAlvo = comAlvo;
+    faixa.cents = [];
+    mostrarFaixa();
+  }
+
+  function mostrarFaixa() {
+    const v = faixa.cents, cheia = $('#afFaixaCheia'), meio = $('#afFaixaMeio'), txt = $('#afFaixaTxt');
+    const pos = (c) => `${50 + 50 * Math.max(-1, Math.min(1, c / FAIXA_ESC))}%`;
+    if (v.length < 10) {
+      cheia.style.opacity = meio.style.opacity = '0';
+      txt.innerHTML = 'Faça a nota o mais grave e o mais aguda que conseguir, mudando a força do sopro e a embocadura, sem deixar a nota quebrar. Repita 2 ou 3 vezes.';
+      txt.className = 'af-faixa-txt';
+      return;
+    }
+    const lo = percentil(v, 0.05), hi = percentil(v, 0.95), c = (lo + hi) / 2;
+    cheia.style.opacity = '1';
+    cheia.style.left = pos(lo);
+    cheia.style.width = `calc(${pos(hi)} - ${pos(lo)})`;
+    meio.style.opacity = '1';
+    meio.style.left = pos(c);
+    txt.innerHTML = `Faixa ${sinal(Math.round(lo))} a ${sinal(Math.round(hi))}¢ · largura ${Math.round(hi - lo)}¢<br>`
+      + `Centro <b>${sinal(Math.round(c))} cents</b>`;
+    txt.className = 'af-faixa-txt ' + (Math.abs(c) <= 5 ? 'afinado' : Math.abs(c) <= 20 ? 'perto' : 'longe');
+  }
+
   function atualizarAlvoAfinador() {
     if ($('#afinador').hidden) return;
     const a = alvoAfinador();
+    if (a ? a.f !== faixa.ref : faixa.comAlvo) zerarFaixa(a ? a.f : null, !!a);
     $('#afAlvo').innerHTML = a
       ? `Alvo: <b>${a.nome} ${sinal(A.cents(a.f, plano().alvos[a.aberto]))}¢</b> · ${hz(a.f)}`
       : 'Sem alvo nesta etapa: mostrando a nota mais próxima.';
@@ -929,13 +968,23 @@
     agulha.style.left = `${50 + Math.max(-50, Math.min(50, c))}%`;
     cents.textContent = `${sinal(c)} cents`;
     cents.className = 'af-cents ' + (Math.abs(c) <= 5 ? 'afinado' : Math.abs(c) <= 20 ? 'perto' : 'longe');
+    // Sem alvo, a faixa se prende à primeira nota tocada e só recomeça
+    // quando o som se afasta dela (outra nota, não só um sopro mais forte).
+    if (!a && (!faixa.ref || Math.abs(A.cents(r.f, faixa.ref)) > FAIXA_LIM)) zerarFaixa(ref);
+    const cf = A.cents(r.f, faixa.ref || ref);
+    if (r.estavel && Math.abs(cf) <= FAIXA_LIM) {
+      faixa.cents.push(cf);
+      if (faixa.cents.length > 3000) faixa.cents.shift();
+      mostrarFaixa();
+    }
   }
 
   async function abrirAfinador() {
     $('#afinador').hidden = false;
     $('#abrirAfinador').hidden = true;
     atualizarAlvoAfinador();
-    $('#afMsg').textContent = 'Sopre a nota com a força normal de tocar.';
+    $('#afMsg').textContent = 'Afine pelo centro da faixa, não pela leitura de um sopro só.';
+    zerarFaixa(faixa.comAlvo ? faixa.ref : null, faixa.comAlvo);
     try {
       await af.iniciar();
     } catch (err) {
@@ -955,6 +1004,7 @@
 
   $('#abrirAfinador').addEventListener('click', abrirAfinador);
   $('#fecharAfinador').addEventListener('click', fecharAfinador);
+  $('#afZerar').addEventListener('click', () => zerarFaixa(faixa.comAlvo ? faixa.ref : null, faixa.comAlvo));
   $('#afTom').addEventListener('click', () => {
     if (af.tocando) {
       af.pararTom();
