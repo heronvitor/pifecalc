@@ -49,9 +49,14 @@
     const base = novoProjeto();
     const p = Object.assign(base, dados);
     p.furos = base.furos.map((h, i) => Object.assign(h, (dados.furos || [])[i]));
-    // Embocaduras feitas com a sugestão antiga (1 diâmetro do nó) e sem a
-    // distância registrada: fixa o valor para o plano não mudar sozinho.
-    if (p.embFeito && p.rolha == null) p.rolha = Math.round(geometriaPadrao(p).dTopo);
+    // Embocaduras feitas com as sugestões antigas (a 1 diâmetro do nó, furo de
+    // 0,6 diâmetro) sem as medidas registradas: fixa os valores para o plano
+    // não mudar sozinho.
+    if (p.embFeito && (p.rolha == null || p.embDiam == null)) {
+      const { dTopo } = geometriaPadrao(p);
+      if (p.rolha == null) p.rolha = Math.round(dTopo);
+      if (p.embDiam == null) p.embDiam = arred05(0.6 * dTopo);
+    }
     return p;
   }
 
@@ -123,7 +128,7 @@
     const dPe = p.dPe || dTopo;
     // Embocadura a 1,5 diâmetro do nó: longe da parte irregular perto do nó;
     // a câmara maior baixa um pouco a 2ª oitava, que tende a sair alta.
-    const sug = { rolha: Math.round(1.5 * dTopo), emb: arred05(0.6 * dTopo) };
+    const sug = { rolha: Math.round(1.5 * dTopo), emb: arred05(0.75 * dTopo) };
     const geo = {
       dTopo, dPe,
       parede: p.parede || 3,
