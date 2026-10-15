@@ -121,9 +121,9 @@
     const { gas, midi, alvos, meiaOnda, dTopo } = geometriaPadrao(p);
     const faixa = [meiaOnda / 32, meiaOnda / 22];
     const dPe = p.dPe || dTopo;
-    // Embocadura a 2 diâmetros do nó: longe da parte irregular perto do nó;
+    // Embocadura a 1,5 diâmetro do nó: longe da parte irregular perto do nó;
     // a câmara maior baixa um pouco a 2ª oitava, que tende a sair alta.
-    const sug = { rolha: Math.round(2 * dTopo), emb: arred05(0.6 * dTopo) };
+    const sug = { rolha: Math.round(1.5 * dTopo), emb: arred05(0.6 * dTopo) };
     const geo = {
       dTopo, dPe,
       parede: p.parede || 3,
@@ -336,7 +336,7 @@
           <h2>Embocadura</h2>
           <div class="cartao">
             <p>Centro da embocadura a</p><p class="grande" data-s="rolhaSug"></p>
-            <p>da face interna do nó (ou da rolha): 2 diâmetros internos, longe da parte irregular perto do nó.</p>
+            <p>da face interna do nó (ou da rolha): 1,5 diâmetro interno, longe da parte irregular perto do nó.</p>
           </div>
           <div class="cartao">
             <p>Diâmetro final sugerido</p><p class="grande" data-s="embSug"></p>
