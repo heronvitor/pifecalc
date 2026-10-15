@@ -202,8 +202,6 @@ input, select {
 input:disabled { background: #f0f0f3; color: var(--suave); }
 input:focus, select:focus { outline: 2px solid var(--azul); outline-offset: 1px; }
 
-label.campo > span.com-botao { display: flex; gap: 6px; margin: 0; }
-.com-botao input { flex: 1; min-width: 0; }
 
 button {
   min-height: 44px;
@@ -374,7 +372,7 @@ td.c-longe { color: var(--vermelho); font-weight: 600; }
   font-size: 0.7rem;
   color: var(--suave);
 }
-.af-botoes { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
+.af-botoes { display: grid; gap: 8px; margin-top: 10px; }
 .af-msg { font-size: 0.85rem; color: var(--suave); margin: 8px 0 0; min-height: 1.2em; }
 
 /* ---------- desenho do tubo ---------- */

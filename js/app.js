@@ -4,6 +4,7 @@
   const A = window.Acustica;
   const CHAVE = 'pifano.v1';
   const VAO_MAX_DEDOS = 35; // mm entre furos vizinhos da mesma mão
+  const TEMPERATURA = 30; // °C do ar dentro do pífano enquanto se toca
 
   // ---------- utilidades ----------
   const $ = (s, el = document) => el.querySelector(s);
@@ -28,13 +29,13 @@
       id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
       nome: nome || 'Meu pífano',
       criado: new Date().toISOString(),
-      nota: 9, oitava: 4, la4: 440, temperatura: 30,
+      nota: 9, oitava: 4, la4: 440,
       afinacao: 'temperada', desvios: [0, 0, 0, 0, 0, 0, 0],
       dTopo: null, dPe: null, parede: null,
       rolha: null, embDiam: null, embFeito: false,
-      comprimento: null, fComp: null, compFeito: false, deltaEmb: 0, alvoComp: null,
+      comprimento: null, compFeito: false, deltaEmb: 0, alvoComp: null,
       furos: Array.from({ length: 6 }, () => ({
-        diamPlan: null, posReal: null, diamReal: null, fMedida: null,
+        diamPlan: null, posReal: null, diamReal: null,
         feito: false, pos: null, diam: null, erro: 0, alvo: null,
       })),
       corrigir: true,
@@ -94,7 +95,7 @@
   function plano() {
     const p = proj();
     const chave = JSON.stringify([
-      p.nota, p.oitava, p.la4, p.temperatura, p.desvios, p.dTopo, p.dPe, p.parede, p.rolha, p.embDiam,
+      p.nota, p.oitava, p.la4, p.desvios, p.dTopo, p.dPe, p.parede, p.rolha, p.embDiam,
       p.compFeito, p.comprimento, p.deltaEmb, p.corrigir,
       p.furos.map((h) => [h.diamPlan, h.feito, h.pos, h.diam, h.erro]),
     ]);
@@ -103,7 +104,7 @@
   }
 
   function calcular(p) {
-    const gas = A.ar(p.temperatura ?? 30);
+    const gas = A.ar(TEMPERATURA);
     const midi = (p.oitava + 1) * 12 + p.nota;
     const alvos = A.alvos({ midi, la4: p.la4 || 440, desvios: p.desvios });
     const meiaOnda = gas.c / (2 * alvos[0]) * 1000;
@@ -216,11 +217,8 @@
             <label class="campo"><span>Oitava</span><select data-c="oitava">${oitavas}</select></label>
           </div>
           <div class="cartao"><p class="grande" data-s="tonica"></p><p class="ajuda" data-s="tonicaInfo"></p></div>
-          <div class="grade2">
-            <label class="campo"><span>Diapasão Lá4 (Hz)</span><input inputmode="decimal" data-c="la4" value="${valor(p.la4)}"></label>
-            <label class="campo"><span>Ar no tubo (°C)</span><input inputmode="decimal" data-c="temperatura" value="${valor(p.temperatura)}"></label>
-          </div>
-          <p class="ajuda">O sopro aquece o ar dentro do pífano: 30 °C é um bom ponto de partida em dia quente. Toque um pouco antes de afinar.</p>
+          <label class="campo"><span>Diapasão Lá4 (Hz)</span><input inputmode="decimal" data-c="la4" value="${valor(p.la4)}"></label>
+          <p class="ajuda">Toque um pouco antes de afinar: o sopro aquece o ar dentro do pífano e a nota sobe.</p>
           <h3>Afinação da escala</h3>
           <label class="campo"><span>Modelo</span><select data-c="afinacao">${modelos}</select></label>
           <p class="ajuda">Desvio de cada grau em cents (100 = 1 semitom) em relação à escala maior temperada. Os modelos são aproximações: ajuste pelo pífano de referência.</p>
@@ -232,7 +230,7 @@
       saidas(p, pl) {
         const s = {
           tonica: `${nomeGrau(pl, 0)} · ${hz(pl.alvos[0])}`,
-          tonicaInfo: `Meia onda a ${fmt(p.temperatura ?? 30)} °C: ${mm(pl.meiaOnda)}.`,
+          tonicaInfo: `Meia onda: ${mm(pl.meiaOnda)}.`,
         };
         pl.alvos.forEach((f, k) => { s['nome' + k] = nomeGrau(pl, k); s['hz' + k] = fmt(f, 1); });
         return s;
@@ -337,9 +335,6 @@
           <h3>Como ficou</h3>
           <label class="campo"><span>Comprimento final, do centro da embocadura ao pé (mm)</span>
             <input inputmode="decimal" data-c="comprimento" value="${valor(p.comprimento)}" ${trava}></label>
-          <label class="campo"><span>Frequência medida (Hz) — opcional; sem ela, vale o alvo</span>
-            <span class="com-botao"><input inputmode="decimal" data-c="fComp" value="${valor(p.fComp)}" ${trava}>
-            <button type="button" class="secundario" data-acao="lerAfinador" ${trava}>Ler</button></span></label>
           ${p.compFeito
             ? `<p class="ok" data-s="calib"></p><button type="button" class="secundario largo" data-acao="compRefazer">Alterar comprimento</button>`
             : `<button type="button" class="largo" data-acao="compConfirmar">Confirmar comprimento</button>`}`;
@@ -396,11 +391,8 @@
             <label class="campo"><span>Posição real (mm da emb.)</span><input inputmode="decimal" data-c="furo.posReal" data-i="${i}" value="${valor(h.feito ? h.pos : h.posReal)}" ${trava}></label>
             <label class="campo"><span>Diâmetro final (mm)</span><input inputmode="decimal" data-c="furo.diamReal" data-i="${i}" value="${valor(h.feito ? h.diam : h.diamReal)}" ${trava}></label>
           </div>
-          <label class="campo"><span>Frequência medida (Hz) — opcional; sem ela, vale o alvo</span>
-            <span class="com-botao"><input inputmode="decimal" data-c="furo.fMedida" data-i="${i}" value="${valor(h.fMedida)}" ${trava}>
-            <button type="button" class="secundario" data-acao="lerAfinador" ${trava}>Ler</button></span></label>
           <label class="toggle">
-            <span>Corrigir os próximos furos pela diferença medida neste</span>
+            <span>Corrigir os próximos furos pelo resultado deste</span>
             <input type="checkbox" data-c="corrigir" ${p.corrigir ? 'checked' : ''}>
             <span class="toggle-track"></span></label>
           ${h.feito
@@ -618,11 +610,10 @@
       const p = proj(), pl = plano();
       if (p.comprimento == null) { alert('Informe o comprimento final medido.'); return; }
       const alvo = pl.alvoComp;
-      const fReal = p.fComp || alvo;
       const geo = { ...pl.geo, comprimento: p.comprimento, furos: [], deltaEmb: 0 };
-      const d = A.calibrarEmbocadura(geo, 0, fReal, pl.gas);
+      const d = A.calibrarEmbocadura(geo, 0, alvo, pl.gas);
       if (d == null) {
-        alert('Essa medida está muito longe do previsto pelo cálculo. Confira o comprimento, a frequência e as medidas da embocadura.');
+        alert('Essa medida está muito longe do previsto pelo cálculo. Confira o comprimento e as medidas da embocadura.');
         return;
       }
       Object.assign(p, { deltaEmb: d, alvoComp: alvo, compFeito: true });
@@ -637,11 +628,10 @@
       const pos = Math.round((h.posReal ?? pl.geo.furos[i].pos) * 10) / 10;
       const diam = Math.round((h.diamReal ?? pl.geo.furos[i].diam) * 10) / 10;
       const alvo = pl.info[i].alvoAfinador;
-      const fReal = h.fMedida || alvo;
       const furos = pl.geo.furos.slice(0, i + 1).map((f) => ({ ...f }));
       furos[i] = { pos, diam };
-      const fModelo = A.ressonancia({ ...pl.geo, furos }, i + 1, pl.gas, fReal);
-      Object.assign(h, { pos, diam, alvo, erro: A.cents(fModelo, fReal), feito: true });
+      const fModelo = A.ressonancia({ ...pl.geo, furos }, i + 1, pl.gas, alvo);
+      Object.assign(h, { pos, diam, alvo, erro: A.cents(fModelo, alvo), feito: true });
       salvar();
       renderPasso();
     },
@@ -651,8 +641,6 @@
       salvar();
       renderPasso();
     },
-
-    lerAfinador() { abrirAfinador(); },
 
     novo() {
       const nome = prompt('Nome do novo pífano:', 'Pífano ' + (Object.keys(banco.projetos).length + 1));
@@ -742,16 +730,15 @@
   });
 
   // ---------- afinador ----------
-  let ultima = null;
   const af = new window.Afinador(mostrarLeitura);
 
   function alvoAfinador() {
     const p = proj(), s = PASSOS[p.passo], pl = plano();
     if (pl.falhou) return null;
-    if (s.id === 'comp') return { f: p.compFeito ? p.alvoComp : pl.alvoComp, nome: nomeGrau(pl, 0), campo: 'fComp', aberto: 0 };
+    if (s.id === 'comp') return { f: p.compFeito ? p.alvoComp : pl.alvoComp, nome: nomeGrau(pl, 0), aberto: 0 };
     if (s.id === 'furo') {
       const h = p.furos[s.i];
-      return { f: h.feito ? h.alvo : pl.info[s.i].alvoAfinador, nome: nomeGrau(pl, s.i + 1), campo: 'furo.fMedida', i: s.i, aberto: s.i + 1 };
+      return { f: h.feito ? h.alvo : pl.info[s.i].alvoAfinador, nome: nomeGrau(pl, s.i + 1), aberto: s.i + 1 };
     }
     return null;
   }
@@ -765,10 +752,8 @@
   }
 
   function mostrarLeitura(r) {
-    ultima = r;
     const agulha = $('#afAgulha'), cents = $('#afCents');
     const a = alvoAfinador();
-    $('#afUsar').disabled = !(r && r.estavel && a && !(a.i != null ? proj().furos[a.i].feito : proj().compFeito));
     if (!r) {
       agulha.style.opacity = '0.2';
       $('#afNota').textContent = '—';
@@ -823,18 +808,6 @@
       $('#afTom').textContent = '■ Parar';
     }
   });
-  $('#afUsar').addEventListener('click', () => {
-    const a = alvoAfinador();
-    if (!a || !ultima) return;
-    const f = Math.round(ultima.f * 10) / 10;
-    const p = proj();
-    if (a.i != null) p.furos[a.i].fMedida = f; else p[a.campo] = f;
-    const campo = $(`[data-c="${a.campo}"]`);
-    if (campo) campo.value = valor(f);
-    salvar();
-    $('#afMsg').textContent = `Registrado: ${hz(f)}.`;
-  });
-
   // ---------- início ----------
   renderProjetos();
   renderPasso();
