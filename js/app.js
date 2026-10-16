@@ -9,6 +9,7 @@
   const DIAM_MIN_SEMITOM = 6; // mm: mínimo dos furos de semitom (não precisam de meio furo)
   const SEMITOM_MAX = 125; // cents: até aqui o intervalo conta como semitom (não precisa de meio furo)
   const LA4 = 440; // Hz: diapasão
+  const EMB_MAX = 16; // mm: maior embocadura sugerida (bambus largos)
   const TEMPERATURA = 30; // °C do ar dentro do pífano enquanto se toca
 
   // ---------- utilidades ----------
@@ -131,7 +132,7 @@
     const dPe = p.dPe || dTopo;
     // Embocadura a 1,5 diâmetro do nó: longe da parte irregular perto do nó;
     // a câmara maior baixa um pouco a 2ª oitava, que tende a sair alta.
-    const sug = { rolha: Math.round(1.5 * dTopo), emb: arred05(0.75 * dTopo) };
+    const sug = { rolha: Math.round(1.5 * dTopo), emb: Math.min(EMB_MAX, arred05(0.75 * dTopo)) };
     const geo = {
       dTopo, dPe,
       parede: p.parede || 3,
