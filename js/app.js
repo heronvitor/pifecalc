@@ -35,7 +35,7 @@
       id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
       nome: nome || 'Meu pífano',
       criado: new Date().toISOString(),
-      nota: 9, oitava: 4, diamMin: null,
+      nota: 9, oitava: 4, diamMin: null, diamMax: null,
       afinacao: 'temperada', desvios: [0, 0, 0, 0, 0, 0, 0],
       dTopo: null, dPe: null, parede: null,
       rolha: null, embDiam: null, embFeito: false,
@@ -109,7 +109,7 @@
   function plano() {
     const p = proj();
     const chave = JSON.stringify([
-      p.nota, p.oitava, p.diamMin, p.desvios, p.dTopo, p.dPe, p.parede, p.rolha, p.embDiam,
+      p.nota, p.oitava, p.diamMin, p.diamMax, p.desvios, p.dTopo, p.dPe, p.parede, p.rolha, p.embDiam,
       p.compFeito, p.comprimento, p.deltaEmb, p.corrigir,
       p.furos.map((h) => [h.diamPlan, h.feito, h.pos, h.diam, h.erro]),
     ]);
@@ -147,9 +147,10 @@
     // para perto da embocadura e abre espaço entre os dedos.
     const semitom = (i) =>
       100 * (A.ESCALA_MAIOR[i + 1] - A.ESCALA_MAIOR[i]) + p.desvios[i + 1] - p.desvios[i] <= SEMITOM_MAX;
-    const dMinFuro = (i) => (semitom(i) ? DIAM_MIN_SEMITOM : p.diamMin || DIAM_MIN);
+    // Com máximo informado, ele prevalece sobre o mínimo.
+    const dMinFuro = (i) => Math.min(p.diamMax || Infinity, semitom(i) ? DIAM_MIN_SEMITOM : p.diamMin || DIAM_MIN);
     const diamSugerido = (i, x) =>
-      Math.max(dMinFuro(i), Math.min(13, arred05((semitom(i) ? 0.45 : 0.6) * A.diametroEm(geo, x))));
+      Math.max(dMinFuro(i), Math.min(p.diamMax || 13, arred05((semitom(i) ? 0.45 : 0.6) * A.diametroEm(geo, x))));
     geo.furos = p.furos.map((h, i) => (h.feito
       ? { pos: h.pos, diam: h.diam }
       : { pos: 0, diam: h.diamPlan || diamSugerido(i, geo.comprimento * (0.85 - 0.1 * i)) }));
@@ -169,7 +170,8 @@
         const h = p.furos[i];
         if (h.feito) { erro = p.corrigir ? h.erro || 0 : 0; continue; }
         const alvoModelo = alvos[i + 1] * Math.pow(2, erro / 1200);
-        const dMax = Math.max(p.diamMin || DIAM_MIN, Math.min(14, arred05(0.9 * A.diametroEm(geo, geo.comprimento * 0.6))));
+        const dMax = p.diamMax
+          || Math.max(p.diamMin || DIAM_MIN, Math.min(14, arred05(0.9 * A.diametroEm(geo, geo.comprimento * 0.6))));
         let r = A.resolverFuro(geo, i, alvoModelo, gas);
         if (!h.diamPlan) {
           while (r.fora === 'alto' && geo.furos[i].diam < dMax) {
@@ -288,8 +290,11 @@
           </div>
           <div class="cartao"><p class="grande" data-s="tonica"></p><p class="ajuda" data-s="tonicaInfo"></p></div>
           <p class="ajuda">Toque um pouco antes de afinar: o sopro aquece o ar dentro do pífano e a nota sobe.</p>
-          <label class="campo"><span>Diâmetro mínimo dos furos (mm)</span><input inputmode="decimal" data-c="diamMin" value="${valor(p.diamMin)}" placeholder="${valor(DIAM_MIN)}"></label>
-          <p class="ajuda">Furos maiores facilitam tapar meio furo. O cálculo nunca sugere furos menores que este valor, exceto quando a nota do furo aberto fica só um semitom acima da nota com ele tampado: ali não se usa meio furo, e o furo sai menor (mínimo de ${DIAM_MIN_SEMITOM} mm).</p>
+          <div class="grade2">
+            <label class="campo"><span>Diâm. mínimo dos furos (mm)</span><input inputmode="decimal" data-c="diamMin" value="${valor(p.diamMin)}" placeholder="${valor(DIAM_MIN)}"></label>
+            <label class="campo"><span>Diâm. máximo dos furos (mm)</span><input inputmode="decimal" data-c="diamMax" value="${valor(p.diamMax)}" placeholder="automático"></label>
+          </div>
+          <p class="ajuda">Furos maiores facilitam tapar meio furo. O cálculo nunca sugere furos menores que este valor, exceto quando a nota do furo aberto fica só um semitom acima da nota com ele tampado: ali não se usa meio furo, e o furo sai menor (mínimo de ${DIAM_MIN_SEMITOM} mm). O máximo depende do tamanho dos dedos: furo maior que a ponta do dedo não veda.</p>
           <h3>Afinação da escala</h3>
           <label class="campo"><span>Modelo</span><select data-c="afinacao">${modelos}</select></label>
           <p class="ajuda">Desvio de cada grau em cents (100 = 1 semitom) em relação à escala maior temperada. Os modelos são aproximações: ajuste pelo pífano de referência.</p>
