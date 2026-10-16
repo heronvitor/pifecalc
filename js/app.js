@@ -5,7 +5,10 @@
   const CHAVE = 'pifano.v1';
   const VAO_MAX_DEDOS = 35; // mm entre furos vizinhos da mesma mão
   const VAO_MIN = 18; // mm mínimos entre centros de furos vizinhos (ex.: furos 2 e 3, um semitom)
-  const DIAM_MIN = 5; // mm: furo menor que isso soa fraco e instável
+  const DIAM_MIN = 10; // mm: mínimo padrão dos furos; menor que isso fica difícil tapar meio furo
+  const DIAM_MIN_SOM = 5; // mm: furo menor que isso soa fraco e instável
+  const SEMITOM_MAX = 125; // cents: até aqui o intervalo conta como semitom (não precisa de meio furo)
+  const LA4 = 440; // Hz: diapasão
   const TEMPERATURA = 30; // °C do ar dentro do pífano enquanto se toca
 
   // ---------- utilidades ----------
@@ -31,7 +34,7 @@
       id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
       nome: nome || 'Meu pífano',
       criado: new Date().toISOString(),
-      nota: 9, oitava: 4, la4: 440,
+      nota: 9, oitava: 4, diamMin: null,
       afinacao: 'temperada', desvios: [0, 0, 0, 0, 0, 0, 0],
       dTopo: null, dPe: null, parede: null,
       rolha: null, embDiam: null, embFeito: false,
@@ -105,7 +108,7 @@
   function plano() {
     const p = proj();
     const chave = JSON.stringify([
-      p.nota, p.oitava, p.la4, p.desvios, p.dTopo, p.dPe, p.parede, p.rolha, p.embDiam,
+      p.nota, p.oitava, p.diamMin, p.desvios, p.dTopo, p.dPe, p.parede, p.rolha, p.embDiam,
       p.compFeito, p.comprimento, p.deltaEmb, p.corrigir,
       p.furos.map((h) => [h.diamPlan, h.feito, h.pos, h.diam, h.erro]),
     ]);
@@ -116,7 +119,7 @@
   function geometriaPadrao(p) {
     const gas = A.ar(TEMPERATURA);
     const midi = (p.oitava + 1) * 12 + p.nota;
-    const alvos = A.alvos({ midi, la4: p.la4 || 440, desvios: p.desvios });
+    const alvos = A.alvos({ midi, la4: LA4, desvios: p.desvios });
     const meiaOnda = gas.c / (2 * alvos[0]) * 1000;
     const dTopo = p.dTopo || arred05(meiaOnda / 26);
     return { gas, midi, alvos, meiaOnda, dTopo };
@@ -138,10 +141,16 @@
       comprimento: p.compFeito ? p.comprimento : meiaOnda * 0.88,
       furos: [],
     };
-    const diamSugerido = (x) => Math.min(11, Math.max(5, arred05(0.6 * A.diametroEm(geo, x))));
+    // Meio furo serve para tirar a nota entre o furo tampado (grau i) e aberto
+    // (grau i+1). Se esse intervalo já é um semitom, o mínimo não se aplica.
+    const dMinFuro = (i) => {
+      const passo = 100 * (A.ESCALA_MAIOR[i + 1] - A.ESCALA_MAIOR[i]) + p.desvios[i + 1] - p.desvios[i];
+      return passo <= SEMITOM_MAX ? DIAM_MIN_SOM : p.diamMin || DIAM_MIN;
+    };
+    const diamSugerido = (i, x) => Math.max(dMinFuro(i), Math.min(13, arred05(0.75 * A.diametroEm(geo, x))));
     geo.furos = p.furos.map((h, i) => (h.feito
       ? { pos: h.pos, diam: h.diam }
-      : { pos: 0, diam: h.diamPlan || diamSugerido(geo.comprimento * (0.85 - 0.1 * i)) }));
+      : { pos: 0, diam: h.diamPlan || diamSugerido(i, geo.comprimento * (0.85 - 0.1 * i)) }));
 
     const info = p.furos.map(() => ({}));
     const pl = { gas, midi, alvos, meiaOnda, faixa, dTopo, dPe, sug, geo, info, falhou: false };
@@ -158,7 +167,7 @@
         const h = p.furos[i];
         if (h.feito) { erro = p.corrigir ? h.erro || 0 : 0; continue; }
         const alvoModelo = alvos[i + 1] * Math.pow(2, erro / 1200);
-        const dMax = Math.min(12, arred05(0.85 * A.diametroEm(geo, geo.comprimento * 0.6)));
+        const dMax = Math.max(p.diamMin || DIAM_MIN, Math.min(14, arred05(0.9 * A.diametroEm(geo, geo.comprimento * 0.6))));
         let r = A.resolverFuro(geo, i, alvoModelo, gas);
         if (!h.diamPlan) {
           while (r.fora === 'alto' && geo.furos[i].diam < dMax) {
@@ -168,7 +177,7 @@
         }
         geo.furos[i].pos = r.x;
         info[i] = { fora: r.fora, erro, alvoModelo, afastado: info[i].afastado }; // afastado vem da 1ª volta
-        if (i > 0 && r.fora !== 'alto') afastar(p, geo, info, i, gas, dMax);
+        if (i > 0 && r.fora !== 'alto') afastar(p, geo, info, i, gas, dMinFuro, dMax);
       }
     }
 
@@ -194,7 +203,7 @@
    * o diâmetro de cada um para manter a nota. Furos já feitos ou com
    * diâmetro escolhido pelo usuário não são alterados.
    */
-  function afastar(p, geo, info, i, gas, dMax) {
+  function afastar(p, geo, info, i, gas, dMinFuro, dMax) {
     const baixo = geo.furos[i - 1], cima = geo.furos[i];
     const falta = VAO_MIN - (baixo.pos - cima.pos);
     if (falta <= 0.5) return;
@@ -203,7 +212,7 @@
 
     const ajustar = (k, pos, alvo) => {
       geo.furos[k].pos = pos;
-      const d = A.resolverDiametro(geo, k, alvo, gas, DIAM_MIN, dMax);
+      const d = A.resolverDiametro(geo, k, alvo, gas, dMinFuro(k), dMax);
       geo.furos[k].diam = arred05(d.x);
       // reposiciona para o diâmetro arredondado (mantém a nota exata)
       const r = A.resolverFuro(geo, k, alvo, gas);
@@ -276,8 +285,9 @@
             <label class="campo"><span>Oitava</span><select data-c="oitava">${oitavas}</select></label>
           </div>
           <div class="cartao"><p class="grande" data-s="tonica"></p><p class="ajuda" data-s="tonicaInfo"></p></div>
-          <label class="campo"><span>Diapasão Lá4 (Hz)</span><input inputmode="decimal" data-c="la4" value="${valor(p.la4)}"></label>
           <p class="ajuda">Toque um pouco antes de afinar: o sopro aquece o ar dentro do pífano e a nota sobe.</p>
+          <label class="campo"><span>Diâmetro mínimo dos furos (mm)</span><input inputmode="decimal" data-c="diamMin" value="${valor(p.diamMin)}" placeholder="${valor(DIAM_MIN)}"></label>
+          <p class="ajuda">Furos maiores facilitam tapar meio furo. O cálculo nunca sugere furos menores que este valor, exceto quando a nota do furo aberto fica só um semitom acima da nota com ele tampado (ali não se usa meio furo).</p>
           <h3>Afinação da escala</h3>
           <label class="campo"><span>Modelo</span><select data-c="afinacao">${modelos}</select></label>
           <p class="ajuda">Desvio de cada grau em cents (100 = 1 semitom) em relação à escala maior temperada. Os modelos são aproximações: ajuste pelo pífano de referência.</p>
@@ -665,7 +675,7 @@
       return r + '</svg>';
     })();
 
-    const tom = `${nomeGrau(pl, 0)} (${fmt(pl.alvos[0], 1)} Hz, Lá4 = ${fmt(p.la4 || 440)} Hz)`;
+    const tom = `${nomeGrau(pl, 0)} (${fmt(pl.alvos[0], 1)} Hz, Lá4 = ${LA4} Hz)`;
     $('#impressao').innerHTML = `
       <h1>${esc(p.nome)} — gabarito</h1>
       <p class="g-info">Tônica ${tom} · bambu ${g.dTopo === g.dPe ? fmt(g.dTopo, 1) : `${fmt(g.dTopo, 1)} → ${fmt(g.dPe, 1)}`} mm interno, parede ${fmt(g.parede, 1)} mm · ${new Date().toLocaleDateString('pt-BR')}</p>
@@ -978,7 +988,7 @@
       cents.className = 'af-cents';
       return;
     }
-    const la4 = proj().la4 || 440;
+    const la4 = LA4;
     const midi = 69 + 12 * Math.log2(r.f / la4);
     const ref = a ? a.f : la4 * Math.pow(2, (Math.round(midi) - 69) / 12);
     const c = A.cents(r.f, ref);
