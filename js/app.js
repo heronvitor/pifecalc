@@ -6,7 +6,7 @@
   const VAO_MAX_DEDOS = 35; // mm entre furos vizinhos da mesma mão
   const VAO_MIN = 18; // mm mínimos entre centros de furos vizinhos (ex.: furos 2 e 3, um semitom)
   const DIAM_MIN = 10; // mm: mínimo padrão dos furos; menor que isso fica difícil tapar meio furo
-  const DIAM_MIN_SOM = 5; // mm: furo menor que isso soa fraco e instável
+  const DIAM_MIN_SEMITOM = 6; // mm: mínimo dos furos de semitom (não precisam de meio furo)
   const SEMITOM_MAX = 125; // cents: até aqui o intervalo conta como semitom (não precisa de meio furo)
   const LA4 = 440; // Hz: diapasão
   const TEMPERATURA = 30; // °C do ar dentro do pífano enquanto se toca
@@ -142,12 +142,13 @@
       furos: [],
     };
     // Meio furo serve para tirar a nota entre o furo tampado (grau i) e aberto
-    // (grau i+1). Se esse intervalo já é um semitom, o mínimo não se aplica.
-    const dMinFuro = (i) => {
-      const passo = 100 * (A.ESCALA_MAIOR[i + 1] - A.ESCALA_MAIOR[i]) + p.desvios[i + 1] - p.desvios[i];
-      return passo <= SEMITOM_MAX ? DIAM_MIN_SOM : p.diamMin || DIAM_MIN;
-    };
-    const diamSugerido = (i, x) => Math.max(dMinFuro(i), Math.min(13, arred05(0.75 * A.diametroEm(geo, x))));
+    // (grau i+1). Se esse intervalo já é um semitom, o furo pode ser menor: sobe
+    // para perto da embocadura e abre espaço entre os dedos.
+    const semitom = (i) =>
+      100 * (A.ESCALA_MAIOR[i + 1] - A.ESCALA_MAIOR[i]) + p.desvios[i + 1] - p.desvios[i] <= SEMITOM_MAX;
+    const dMinFuro = (i) => (semitom(i) ? DIAM_MIN_SEMITOM : p.diamMin || DIAM_MIN);
+    const diamSugerido = (i, x) =>
+      Math.max(dMinFuro(i), Math.min(13, arred05((semitom(i) ? 0.45 : 0.6) * A.diametroEm(geo, x))));
     geo.furos = p.furos.map((h, i) => (h.feito
       ? { pos: h.pos, diam: h.diam }
       : { pos: 0, diam: h.diamPlan || diamSugerido(i, geo.comprimento * (0.85 - 0.1 * i)) }));
@@ -287,7 +288,7 @@
           <div class="cartao"><p class="grande" data-s="tonica"></p><p class="ajuda" data-s="tonicaInfo"></p></div>
           <p class="ajuda">Toque um pouco antes de afinar: o sopro aquece o ar dentro do pífano e a nota sobe.</p>
           <label class="campo"><span>Diâmetro mínimo dos furos (mm)</span><input inputmode="decimal" data-c="diamMin" value="${valor(p.diamMin)}" placeholder="${valor(DIAM_MIN)}"></label>
-          <p class="ajuda">Furos maiores facilitam tapar meio furo. O cálculo nunca sugere furos menores que este valor, exceto quando a nota do furo aberto fica só um semitom acima da nota com ele tampado (ali não se usa meio furo).</p>
+          <p class="ajuda">Furos maiores facilitam tapar meio furo. O cálculo nunca sugere furos menores que este valor, exceto quando a nota do furo aberto fica só um semitom acima da nota com ele tampado: ali não se usa meio furo, e o furo sai menor (mínimo de ${DIAM_MIN_SEMITOM} mm).</p>
           <h3>Afinação da escala</h3>
           <label class="campo"><span>Modelo</span><select data-c="afinacao">${modelos}</select></label>
           <p class="ajuda">Desvio de cada grau em cents (100 = 1 semitom) em relação à escala maior temperada. Os modelos são aproximações: ajuste pelo pífano de referência.</p>
