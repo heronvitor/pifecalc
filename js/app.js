@@ -594,7 +594,7 @@
 
   function svgFaixa(g, a, b, k, total, extras) {
     const w = b - a, H = 34, yc = 19, rT = 8;
-    let s = `<svg class="faixa" width="${fmt2(w)}mm" height="${H}mm" viewBox="${fmt2(a)} 0 ${fmt2(w)} ${H}" xmlns="http://www.w3.org/2000/svg">`;
+    let s = `<svg class="g-faixa" width="${fmt2(w)}mm" height="${H}mm" viewBox="${fmt2(a)} 0 ${fmt2(w)} ${H}" xmlns="http://www.w3.org/2000/svg">`;
     // corpo do tubo e linha de centro
     const xNo = -g.rolha;
     const xi = Math.max(a, xNo - 5), xf = Math.min(b, extras.fimTubo);

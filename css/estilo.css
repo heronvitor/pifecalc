@@ -430,7 +430,7 @@ td.c-longe { color: var(--vermelho); font-weight: 600; }
   .g-pequeno-p { font-size: 8pt; margin: 1mm 0 2mm; color: #333; }
   .g-linha { break-inside: avoid; margin: 0 0 4mm; }
   .g-rotulo { font-size: 8pt; color: #333; margin-bottom: 0.5mm; }
-  svg.faixa { display: block; overflow: visible; border: 0.2mm dashed #888; }
+  svg.g-faixa { display: block; overflow: visible; border: 0.2mm dashed #888; }
   .g-tabelas { display: flex; gap: 6mm; align-items: flex-start; break-inside: avoid; margin-top: 2mm; }
   .g-tabelas table { width: auto; flex: 1; font-size: 8.5pt; }
   .g-tabelas th, .g-tabelas td { padding: 1mm 1.5mm; border-bottom: 0.2mm solid #bbb; }
