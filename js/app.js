@@ -6,6 +6,7 @@
   const VAO_MAX_DEDOS = 35; // mm entre furos vizinhos da mesma mão
   const VAO_MIN = 18; // mm mínimos entre centros de furos vizinhos (ex.: furos 2 e 3, um semitom)
   const DIAM_MIN = 10; // mm: mínimo padrão dos furos; menor que isso fica difícil tapar meio furo
+  const DIAM_MAX = 13; // mm: máximo padrão dos furos; maior que isso a ponta do dedo não veda
   const DIAM_MIN_SEMITOM = 6; // mm: mínimo dos furos de semitom (não precisam de meio furo)
   const SEMITOM_MAX = 125; // cents: até aqui o intervalo conta como semitom (não precisa de meio furo)
   const LA4 = 440; // Hz: diapasão
@@ -147,10 +148,11 @@
     // para perto da embocadura e abre espaço entre os dedos.
     const semitom = (i) =>
       100 * (A.ESCALA_MAIOR[i + 1] - A.ESCALA_MAIOR[i]) + p.desvios[i + 1] - p.desvios[i] <= SEMITOM_MAX;
-    // Com máximo informado, ele prevalece sobre o mínimo.
-    const dMinFuro = (i) => Math.min(p.diamMax || Infinity, semitom(i) ? DIAM_MIN_SEMITOM : p.diamMin || DIAM_MIN);
+    // O máximo prevalece sobre o mínimo.
+    const dMaxFuros = p.diamMax || DIAM_MAX;
+    const dMinFuro = (i) => Math.min(dMaxFuros, semitom(i) ? DIAM_MIN_SEMITOM : p.diamMin || DIAM_MIN);
     const diamSugerido = (i, x) =>
-      Math.max(dMinFuro(i), Math.min(p.diamMax || 13, arred05((semitom(i) ? 0.45 : 0.6) * A.diametroEm(geo, x))));
+      Math.max(dMinFuro(i), Math.min(dMaxFuros, arred05((semitom(i) ? 0.45 : 0.6) * A.diametroEm(geo, x))));
     geo.furos = p.furos.map((h, i) => (h.feito
       ? { pos: h.pos, diam: h.diam }
       : { pos: 0, diam: h.diamPlan || diamSugerido(i, geo.comprimento * (0.85 - 0.1 * i)) }));
@@ -170,8 +172,7 @@
         const h = p.furos[i];
         if (h.feito) { erro = p.corrigir ? h.erro || 0 : 0; continue; }
         const alvoModelo = alvos[i + 1] * Math.pow(2, erro / 1200);
-        const dMax = p.diamMax
-          || Math.max(p.diamMin || DIAM_MIN, Math.min(14, arred05(0.9 * A.diametroEm(geo, geo.comprimento * 0.6))));
+        const dMax = Math.min(dMaxFuros, Math.max(p.diamMin || DIAM_MIN, arred05(0.9 * A.diametroEm(geo, geo.comprimento * 0.6))));
         let r = A.resolverFuro(geo, i, alvoModelo, gas);
         if (!h.diamPlan) {
           while (r.fora === 'alto' && geo.furos[i].diam < dMax) {
@@ -292,7 +293,7 @@
           <p class="ajuda">Toque um pouco antes de afinar: o sopro aquece o ar dentro do pífano e a nota sobe.</p>
           <div class="grade2">
             <label class="campo"><span>Diâm. mínimo dos furos (mm)</span><input inputmode="decimal" data-c="diamMin" value="${valor(p.diamMin)}" placeholder="${valor(DIAM_MIN)}"></label>
-            <label class="campo"><span>Diâm. máximo dos furos (mm)</span><input inputmode="decimal" data-c="diamMax" value="${valor(p.diamMax)}" placeholder="automático"></label>
+            <label class="campo"><span>Diâm. máximo dos furos (mm)</span><input inputmode="decimal" data-c="diamMax" value="${valor(p.diamMax ?? DIAM_MAX)}"></label>
           </div>
           <p class="ajuda">Furos maiores facilitam tapar meio furo. O cálculo nunca sugere furos menores que este valor, exceto quando a nota do furo aberto fica só um semitom acima da nota com ele tampado: ali não se usa meio furo, e o furo sai menor (mínimo de ${DIAM_MIN_SEMITOM} mm). O máximo depende do tamanho dos dedos: furo maior que a ponta do dedo não veda.</p>
           <h3>Afinação da escala</h3>
