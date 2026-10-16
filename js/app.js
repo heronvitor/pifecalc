@@ -593,12 +593,19 @@
   const SOBRA = 10; // trecho repetido no início da faixa seguinte, para colar
 
   function svgFaixa(g, a, b, k, total, extras) {
-    const w = b - a, H = 34, yc = 19, rT = 8;
-    let s = `<svg class="g-faixa" width="${fmt2(w)}mm" height="${H}mm" viewBox="${fmt2(a)} 0 ${fmt2(w)} ${H}" xmlns="http://www.w3.org/2000/svg">`;
+    // O tubo é desenhado no diâmetro externo real (interno + 2 paredes).
+    const rExt = (x) => A.diametroEm(g, x) / 2 + g.parede;
+    const rT = Math.max(rExt(0), rExt(g.comprimento));
+    const w = b - a, yc = 11 + rT, H = yc + rT + 7;
+    let s = `<svg class="g-faixa" width="${fmt2(w)}mm" height="${fmt2(H)}mm" viewBox="${fmt2(a)} 0 ${fmt2(w)} ${fmt2(H)}" xmlns="http://www.w3.org/2000/svg">`;
     // corpo do tubo e linha de centro
     const xNo = -g.rolha;
     const xi = Math.max(a, xNo - 5), xf = Math.min(b, extras.fimTubo);
-    if (xf > xi) s += `<rect x="${fmt2(xi)}" y="${yc - rT}" width="${fmt2(xf - xi)}" height="${2 * rT}" class="g-tubo"/>`;
+    if (xf > xi) {
+      const xs = [xi, 0, g.comprimento, xf].filter((x) => x >= xi && x <= xf).sort((p, q) => p - q);
+      const pts = [...xs.map((x) => [x, yc - rExt(x)]), ...xs.reverse().map((x) => [x, yc + rExt(x)])];
+      s += `<polygon points="${pts.map(([x, y]) => `${fmt2(x)},${fmt2(y)}`).join(' ')}" class="g-tubo"/>`;
+    }
     s += `<line x1="${fmt2(a)}" y1="${yc}" x2="${fmt2(b)}" y2="${yc}" class="g-centro"/>`;
     // área de colagem (repete o fim da faixa anterior)
     if (k > 0) {
