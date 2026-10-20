@@ -828,6 +828,21 @@
       if (!p.compFeito) { alert('Confirme o comprimento antes.'); return; }
       const pos = Math.round((h.posReal ?? pl.geo.furos[i].pos) * 10) / 10;
       const diam = Math.round((h.diamReal ?? pl.geo.furos[i].diam) * 10) / 10;
+      const g = pl.geo, planejada = g.furos[i].pos;
+      if (!(pos >= g.rolha + g.embDiam && pos <= g.comprimento - diam / 2)) {
+        alert(`A posição ${fmt(pos, 1)} mm está fora do tubo. Meça do centro da embocadura até o centro do furo, em milímetros (entre ${fmt(g.rolha + g.embDiam)} e ${fmt(g.comprimento)} mm).`);
+        return;
+      }
+      if (i > 0 && pos >= p.furos[i - 1].pos) {
+        alert(`O furo ${i + 1} precisa ficar mais perto da embocadura que o furo ${i} (${mm(p.furos[i - 1].pos, 1)}).`);
+        return;
+      }
+      if (planejada > 0 && Math.abs(pos - planejada) > 0.3 * planejada
+        && !confirm(`A posição ${fmt(pos, 1)} mm está muito longe da planejada (${mm(planejada)}). Confira se a medida está em milímetros e a partir da embocadura. Confirmar mesmo assim?`)) return;
+      if (!(diam > 0 && diam < A.diametroEm(g, pos))) {
+        alert(`O diâmetro ${fmt(diam, 1)} mm não é válido para este tubo.`);
+        return;
+      }
       const alvo = pl.info[i].alvoAfinador;
       const furos = pl.geo.furos.slice(0, i + 1).map((f) => ({ ...f }));
       furos[i] = { pos, diam };
