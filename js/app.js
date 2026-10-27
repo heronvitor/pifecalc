@@ -962,9 +962,15 @@
 
   // Faixa de sopro: cents das leituras estáveis em relação à referência,
   // do mais grave ao mais agudo (sopro e embocadura). O centro é o que se compara ao alvo.
-  const FAIXA_LIM = 150; // ¢ — além disso é oitava, harmônico ou outra nota
+  // O 2º modo (oitava de cima) tem a sua faixa, medida em relação ao dobro da referência.
+  const FAIXA_LIM = 150; // ¢ — além disso é outro harmônico ou outra nota
   const FAIXA_ESC = 100; // ¢ — meia largura da barra
-  const faixa = { ref: null, comAlvo: false, cents: [] };
+  const faixa = { ref: null, comAlvo: false, cents: [], cents2: [] };
+
+  // 1 = perto da referência, 2 = perto da oitava, 0 = outra coisa
+  function modoFaixa(c) {
+    return Math.abs(c) <= FAIXA_LIM ? 1 : Math.abs(c - 1200) <= FAIXA_LIM ? 2 : 0;
+  }
 
   function percentil(v, q) {
     const s = [...v].sort((a, b) => a - b);
@@ -975,17 +981,20 @@
     faixa.ref = ref;
     faixa.comAlvo = comAlvo;
     faixa.cents = [];
+    faixa.cents2 = [];
     mostrarFaixa();
   }
 
-  function mostrarFaixa() {
-    const v = faixa.cents, cheia = $('#afFaixaCheia'), meio = $('#afFaixaMeio'), txt = $('#afFaixaTxt');
+  const classeCents = (c) => Math.abs(c) <= 5 ? 'afinado' : Math.abs(c) <= 20 ? 'perto' : 'longe';
+
+  // Desenha uma barra de faixa e devolve o centro (ou null se ainda não há leituras).
+  function desenharFaixa(v, cheia, meio, txt, vazio) {
     const pos = (c) => `${50 + 50 * Math.max(-1, Math.min(1, c / FAIXA_ESC))}%`;
     if (v.length < 10) {
       cheia.style.opacity = meio.style.opacity = '0';
-      txt.innerHTML = 'Faça a nota o mais grave e o mais aguda que conseguir, mudando a força do sopro e a embocadura, sem deixar a nota quebrar. Repita 2 ou 3 vezes.';
+      txt.innerHTML = vazio;
       txt.className = 'af-faixa-txt';
-      return;
+      return null;
     }
     const lo = percentil(v, 0.05), hi = percentil(v, 0.95), c = (lo + hi) / 2;
     cheia.style.opacity = '1';
@@ -995,7 +1004,26 @@
     meio.style.left = pos(c);
     txt.innerHTML = `Faixa ${sinal(Math.round(lo))} a ${sinal(Math.round(hi))}¢ · largura ${Math.round(hi - lo)}¢<br>`
       + `Centro <b>${sinal(Math.round(c))} cents</b>`;
-    txt.className = 'af-faixa-txt ' + (Math.abs(c) <= 5 ? 'afinado' : Math.abs(c) <= 20 ? 'perto' : 'longe');
+    txt.className = 'af-faixa-txt ' + classeCents(c);
+    return c;
+  }
+
+  function mostrarFaixa() {
+    const c1 = desenharFaixa(faixa.cents, $('#afFaixaCheia'), $('#afFaixaMeio'), $('#afFaixaTxt'),
+      'Faça a nota o mais grave e o mais aguda que conseguir, mudando a força do sopro e a embocadura, sem deixar a nota quebrar. Repita 2 ou 3 vezes.');
+    const c2 = desenharFaixa(faixa.cents2, $('#afFaixa2Cheia'), $('#afFaixa2Meio'), $('#afFaixa2Txt'),
+      'Sopre mais forte para a nota subir uma oitava e faça o mesmo: o mais grave e o mais aguda possível.');
+    const oit = $('#afOitava');
+    if (c1 === null || c2 === null) {
+      oit.innerHTML = '';
+      oit.className = 'af-faixa-txt';
+      return;
+    }
+    // Os dois centros já são cents em relação a ref e 2·ref: a diferença é o desvio da oitava.
+    const d = Math.round(c2 - c1);
+    const como = Math.abs(d) <= 5 ? 'oitava justa' : d > 0 ? 'oitava larga: a de cima está alta' : 'oitava curta: a de cima está baixa';
+    oit.innerHTML = `2º modo em relação ao dobro do 1º: <b>${sinal(d)} cents</b><br>${como}`;
+    oit.className = 'af-faixa-txt ' + classeCents(d);
   }
 
   function atualizarAlvoAfinador() {
@@ -1021,20 +1049,32 @@
     const la4 = LA4;
     const midi = 69 + 12 * Math.log2(r.f / la4);
     const ref = a ? a.f : la4 * Math.pow(2, (Math.round(midi) - 69) / 12);
-    const c = A.cents(r.f, ref);
+    const cr = A.cents(r.f, ref);
+    const c = a && modoFaixa(cr) === 2 ? cr - 1200 : cr; // com alvo, a oitava de cima mira o dobro dele
     $('#afNota').textContent = A.nomeMidi(midi);
     $('#afHz').textContent = hz(r.f);
     agulha.style.opacity = r.estavel ? '1' : '0.5';
     agulha.style.left = `${50 + Math.max(-50, Math.min(50, c))}%`;
     cents.textContent = `${sinal(c)} cents`;
-    cents.className = 'af-cents ' + (Math.abs(c) <= 5 ? 'afinado' : Math.abs(c) <= 20 ? 'perto' : 'longe');
+    cents.className = 'af-cents ' + classeCents(c);
     // Sem alvo, a faixa se prende à primeira nota tocada e só recomeça
-    // quando o som se afasta dela (outra nota, não só um sopro mais forte).
-    if (!a && (!faixa.ref || Math.abs(A.cents(r.f, faixa.ref)) > FAIXA_LIM)) zerarFaixa(ref);
+    // quando o som se afasta dela (outra nota, não só um sopro mais forte ou a oitava).
+    if (!a && faixa.ref) {
+      const c0 = A.cents(r.f, faixa.ref);
+      if (Math.abs(c0 + 1200) <= FAIXA_LIM && !faixa.cents2.length) {
+        // começou pela oitava de cima: o que foi medido passa a ser o 2º modo
+        faixa.ref /= 2;
+        faixa.cents2 = faixa.cents;
+        faixa.cents = [];
+      } else if (!modoFaixa(c0)) zerarFaixa(ref);
+    }
+    if (!a && !faixa.ref) zerarFaixa(ref);
     const cf = A.cents(r.f, faixa.ref || ref);
-    if (r.estavel && Math.abs(cf) <= FAIXA_LIM) {
-      faixa.cents.push(cf);
-      if (faixa.cents.length > 3000) faixa.cents.shift();
+    const modo = modoFaixa(cf);
+    if (r.estavel && modo) {
+      const v = modo === 1 ? faixa.cents : faixa.cents2;
+      v.push(modo === 1 ? cf : cf - 1200);
+      if (v.length > 3000) v.shift();
       mostrarFaixa();
     }
   }

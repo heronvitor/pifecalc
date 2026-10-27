@@ -394,6 +394,7 @@ td.c-longe { color: var(--vermelho); font-weight: 600; }
   opacity: 0;
   transition: left 0.15s;
 }
+.af-modo { margin: 12px 4px 0; font-size: 0.85rem; font-weight: 600; color: var(--suave); }
 .af-faixa-txt { text-align: center; margin: 4px 0 0; font-size: 0.95rem; font-variant-numeric: tabular-nums; min-height: 2.6em; color: var(--suave); }
 .af-faixa-txt b { font-size: 1.15rem; }
 .af-faixa-txt.afinado b { color: var(--verde); }
