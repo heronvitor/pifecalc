@@ -131,9 +131,9 @@
     const { gas, midi, alvos, meiaOnda, dTopo } = geometriaPadrao(p);
     const faixa = [meiaOnda / 32, meiaOnda / 22];
     const dPe = p.dPe || dTopo;
-    // Embocadura a 1,5 diâmetro do nó: longe da parte irregular perto do nó;
-    // a câmara maior baixa um pouco a 2ª oitava, que tende a sair alta.
-    const sug = { rolha: Math.round(1.5 * dTopo), emb: Math.min(EMB_MAX, arred05(0.75 * dTopo)) };
+    // Embocadura a um diâmetro da rolha (ou do nó). A câmara entre os dois afina a
+    // oitava: maior baixa a 2ª oitava, menor sobe — ajuste fino pelo afinador.
+    const sug = { rolha: Math.round(dTopo), emb: Math.min(EMB_MAX, arred05(0.75 * dTopo)) };
     const geo = {
       dTopo, dPe,
       parede: p.parede || 3,
@@ -359,7 +359,7 @@
           <h2>Embocadura</h2>
           <div class="cartao">
             <p>Centro da embocadura a</p><p class="grande" data-s="rolhaSug"></p>
-            <p>da face interna do nó (ou da rolha): 1,5 diâmetro interno, longe da parte irregular perto do nó.</p>
+            <p>da face interna do nó (ou da rolha): um diâmetro da rolha (o diâmetro interno do topo).</p>
           </div>
           <div class="cartao">
             <p>Diâmetro final sugerido</p><p class="grande" data-s="embSug"></p>
@@ -370,6 +370,16 @@
               <li>Comece menor e alargue aos poucos. Furo pequeno dá som doce e fácil, mas fraco; furo maior dá mais volume e pede mais ar.</li>
               <li>Mantenha o furo redondo e a borda de sopro limpa e firme.</li>
               <li>Risque agora uma linha reta ao longo do bambu passando pela embocadura: os furos dos dedos ficam sobre ela.</li>
+            </ul>
+          </details>
+          <details class="mais"><summary>Ajuste inicial da oitava</summary>
+            <ul>
+              <li>Faça primeiro um furo piloto pequeno, com o pé já aberto no 1º corte.</li>
+              <li>No afinador, meça a faixa da nota mais grave nas duas oitavas (sopro fraco e sopro forte).</li>
+              <li><b>Oitava curta</b> (a de cima baixa): a embocadura está longe demais do nó. Ao alargar, puxe o furo para o lado do nó.</li>
+              <li><b>Oitava larga</b> (a de cima alta): a embocadura está perto demais. Ao alargar, puxe o furo para o lado do pé.</li>
+              <li>Com rolha em vez de nó, o ajuste é mais fácil: empurre a rolha para perto da embocadura (oitava curta) ou afaste-a (oitava larga).</li>
+              <li>O afinador diz quantos milímetros mover. Registre abaixo a distância final.</li>
             </ul>
           </details>
           <h3>Como ficou</h3>
@@ -461,6 +471,15 @@
               <li>Alargue aos poucos e confira o centro da faixa no afinador: furo maior → nota mais aguda.</li>
               <li>Chegou ao diâmetro previsto e ainda está baixo? Alargue puxando para o lado da embocadura.</li>
               <li>Passou do ponto? Um pouco de cera na borda do lado da embocadura baixa a nota.</li>
+            </ul>
+          </details>
+          <details class="mais"><summary>Oitava baixa: rebaixo (undercut)</summary>
+            <ul>
+              <li>Meça no afinador a faixa do furo nas duas oitavas. Se a de cima sair baixa (oitava curta), faça o rebaixo.</li>
+              <li>Rebaixo: com lima redonda ou estilete, chanfre por dentro a borda do furo, abrindo em funil para o lado de dentro do tubo. O diâmetro de fora não muda.</li>
+              <li>O rebaixo sobe as duas oitavas, mas a de cima sobe mais. Faça antes de a nota de baixo chegar ao alvo e termine alargando por fora.</li>
+              <li>Vá aos poucos e meça de novo: o afinador avisa quando a oitava ficar justa.</li>
+              <li>Paredes grossas e furos pequenos são os que mais pedem rebaixo.</li>
             </ul>
           </details>
           <h3>Como ficou</h3>
@@ -1022,8 +1041,56 @@
     // Os dois centros já são cents em relação a ref e 2·ref: a diferença é o desvio da oitava.
     const d = Math.round(c2 - c1);
     const como = Math.abs(d) <= 5 ? 'oitava justa' : d > 0 ? 'oitava larga: a de cima está alta' : 'oitava curta: a de cima está baixa';
-    oit.innerHTML = `2º modo em relação ao dobro do 1º: <b>${sinal(d)} cents</b><br>${como}`;
+    const conselho = conselhoOitava(d);
+    oit.innerHTML = `2º modo em relação ao dobro do 1º: <b>${sinal(d)} cents</b><br>${como}`
+      + (conselho ? `<br><span class="af-conselho">${conselho}</span>` : '');
     oit.className = 'af-faixa-txt ' + classeCents(d);
+  }
+
+  const OITAVA_TOL = 10; // ¢ — abaixo disso, não vale mexer no bambu
+
+  // Quanto a oitava (tubo sem furos) muda por mm de distância nó → embocadura, pelo modelo.
+  function sensibilidadeRolha(pl) {
+    if (pl.sensRolha === undefined) {
+      const oit = (rolha) => {
+        const geo = { ...pl.geo, rolha, furos: [] };
+        const f1 = A.ressonancia(geo, 0, pl.gas, pl.alvos[0]);
+        return A.cents(A.ressonancia(geo, 0, pl.gas, pl.alvos[0], 2), 2 * f1);
+      };
+      const r = pl.geo.rolha, s = (oit(r + 2) - oit(Math.max(2, r - 2))) / (r + 2 - Math.max(2, r - 2));
+      pl.sensRolha = isFinite(s) && s < 0 ? s : null;
+    }
+    return pl.sensRolha;
+  }
+
+  function conselhoOitava(d) {
+    if (Math.abs(d) < OITAVA_TOL) return '';
+    const p = proj(), s = PASSOS[p.passo], pl = plano();
+    if (pl.falhou) return '';
+    const curta = d < 0;
+    if (s.id === 'emb' || s.id === 'comp') {
+      const sens = sensibilidadeRolha(pl);
+      const mover = sens ? Math.min(15, Math.max(0.5, arred05(Math.abs(d / sens)))) : null;
+      const quanto = mover ? ` cerca de ${mm(mover, 1)}` : '';
+      if (s.id === 'emb') {
+        if (mover > 3) {
+          return `${curta ? 'Aproxime a embocadura do nó' : 'Afaste a embocadura do nó'}${quanto}. É mais do que dá para puxar alargando: `
+            + 'feche o piloto (cola com serragem do próprio bambu) e fure de novo no lugar novo.';
+        }
+        return curta
+          ? `Aproxime a embocadura do nó${quanto}: ao alargar, puxe o furo para o lado do nó.`
+          : `Afaste a embocadura do nó${quanto}: ao alargar, puxe o furo para o lado do pé.`;
+      }
+      return curta
+        ? `A câmara do nó está grande: empurre a rolha${quanto} para perto da embocadura (ou encoste cera no nó). Depois confira a nota de novo.`
+        : `A câmara do nó está curta: afaste a rolha${quanto}. Com nó natural não há como aumentar; fica para o próximo pífano (embocadura mais longe do nó).`;
+    }
+    if (s.id === 'furo') {
+      return curta
+        ? 'Faça o rebaixo (undercut) neste furo: chanfre a borda por dentro. Ele sobe mais a oitava de cima. Pare antes de a nota de baixo chegar ao alvo.'
+        : 'Não faça rebaixo neste furo: ele subiria ainda mais a oitava de cima. Prefira terminar com o furo menor.';
+    }
+    return '';
   }
 
   function atualizarAlvoAfinador() {
