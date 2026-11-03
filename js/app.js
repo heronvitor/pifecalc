@@ -11,6 +11,9 @@
   const SEMITOM_MAX = 125; // cents: até aqui o intervalo conta como semitom (não precisa de meio furo)
   const LA4 = 440; // Hz: diapasão
   const EMB_MAX = 16; // mm: maior embocadura sugerida (bambus largos)
+  const BORDA_NO = 3; // mm mínimos de bambu entre a borda da embocadura e a face do nó
+  const ROLHA_FATOR = 0.5; // distância nó → centro da embocadura = fator × diâm. interno + extra
+  const ROLHA_EXTRA = 3; // mm
   const TEMPERATURA = 30; // °C do ar dentro do pífano enquanto se toca
 
   // ---------- utilidades ----------
@@ -131,9 +134,13 @@
     const { gas, midi, alvos, meiaOnda, dTopo } = geometriaPadrao(p);
     const faixa = [meiaOnda / 32, meiaOnda / 22];
     const dPe = p.dPe || dTopo;
-    // Embocadura a um diâmetro da rolha (ou do nó). A câmara entre os dois afina a
-    // oitava: maior baixa a 2ª oitava, menor sobe — ajuste fino pelo afinador.
-    const sug = { rolha: Math.round(dTopo), emb: Math.min(EMB_MAX, arred05(0.75 * dTopo)) };
+    // Embocadura perto do nó (ou da rolha). A câmara entre os dois afina a oitava:
+    // quanto menor, mais sobe a 2ª oitava (menos rebaixo nos furos).
+    const embSug = Math.min(EMB_MAX, arred05(0.75 * dTopo));
+    const sug = {
+      rolha: Math.ceil(Math.max(ROLHA_FATOR * dTopo + ROLHA_EXTRA, (p.embDiam || embSug) / 2 + BORDA_NO)),
+      emb: embSug,
+    };
     const geo = {
       dTopo, dPe,
       parede: p.parede || 3,
@@ -348,7 +355,7 @@
           <h2>Embocadura</h2>
           <div class="cartao">
             <p>Centro da embocadura a</p><p class="grande" data-s="rolhaSug"></p>
-            <p>da face interna do nó (ou da rolha): um diâmetro da rolha (o diâmetro interno do topo).</p>
+            <p>da face interna do nó (ou da rolha): ${fmt(ROLHA_FATOR, 1)} × o diâmetro interno + ${ROLHA_EXTRA} mm. Quanto mais perto do nó, mais alta sai a oitava de cima e menos rebaixo os furos vão pedir.</p>
           </div>
           <div class="cartao">
             <p>Diâmetro final sugerido</p><p class="grande" data-s="embSug"></p>
