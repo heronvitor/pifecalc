@@ -40,10 +40,10 @@
       afinacao: 'temperada', desvios: [0, 0, 0, 0, 0, 0, 0],
       dTopo: null, dPe: null, parede: null,
       rolha: null, embDiam: null, embFeito: false,
-      comprimento: null, compFeito: false, deltaEmb: 0, alvoComp: null,
+      comprimento: null, compFeito: false, deltaEmb: 0,
       furos: Array.from({ length: 6 }, () => ({
         diamPlan: null, posReal: null, diamReal: null,
-        feito: false, pos: null, diam: null, erro: 0, alvo: null,
+        feito: false, pos: null, diam: null, erro: 0,
       })),
       corrigir: true,
       passo: 0,
@@ -186,17 +186,6 @@
       }
     }
 
-    // Alvos para o afinador durante a construção: os furos de cima ainda não
-    // existem, e quando existirem (fechados) vão baixar levemente a nota.
-    const f0Final = A.ressonancia(geo, 0, gas, alvos[0]);
-    const f0Sem = A.ressonancia({ ...geo, furos: [] }, 0, gas, alvos[0]);
-    pl.alvoComp = alvos[0] * f0Sem / f0Final;
-    for (let i = 0; i < 6; i++) {
-      if (p.furos[i].feito) continue;
-      const fF = A.ressonancia(geo, i + 1, gas, alvos[i + 1]);
-      const fC = A.ressonancia({ ...geo, furos: geo.furos.slice(0, i + 1) }, i + 1, gas, alvos[i + 1]);
-      info[i].alvoAfinar = alvos[i + 1] * fC / fF;
-    }
     pl.margem = Math.max(10, 0.03 * geo.comprimento);
     pl.gomo = geo.rolha + geo.comprimento + pl.margem;
     return pl;
@@ -416,7 +405,6 @@
           </div>
           <div class="cartao alvo">
             <p>Com o tubo ainda sem furos, afine em</p><p class="grande" data-s="alvoComp"></p>
-            <p class="ajuda" data-s="alvoCompInfo"></p>
           </div>
           <p class="ajuda">No afinador, faça a nota o mais grave e o mais aguda possível (mudando sopro e embocadura) e use o <b>centro da faixa</b>. Se estiver baixo, encurte o pé 1 a 2 mm por vez (ou lixe). Pare um pouco antes do alvo: encurtar não tem volta.</p>
           <h3>Como ficou</h3>
@@ -427,13 +415,10 @@
             : `<button type="button" class="largo" data-acao="compConfirmar">Confirmar comprimento</button>`}`;
       },
       saidas(p, pl) {
-        const alvo = p.compFeito ? p.alvoComp : pl.alvoComp;
-        const desvio = A.cents(alvo, pl.alvos[0]);
         return {
           L: pl.falhou ? '—' : mm(pl.geo.comprimento),
           corte: p.compFeito ? '' : `Primeiro corte em <b>${mm(pl.geo.comprimento + pl.margem)}</b> (margem de segurança).`,
-          alvoComp: `${nomeGrau(pl, 0)} ${sinal(desvio)}¢ · ${hz(alvo)}`,
-          alvoCompInfo: `Fica ${fmt(Math.abs(desvio))} cents ${desvio >= 0 ? 'acima' : 'abaixo'} da tônica porque os furos, mesmo tampados, ${desvio >= 0 ? 'abaixam' : 'sobem'} um pouco a nota.`,
+          alvoComp: `${nomeGrau(pl, 0)} · ${hz(pl.alvos[0])}`,
           calib: `Comprimento ${mm(p.comprimento, 1)}. Correção da embocadura calibrada: ${sinal(p.deltaEmb, 1)} mm.`,
         };
       },
@@ -513,12 +498,7 @@
           else if (i !== 3 && vao > VAO_MAX_DEDOS) avisos.push(`${mm(vao)} até o furo ${i} pode ser longe para os dedos. Para aproximar, aumente o diâmetro deste furo ou diminua o do furo ${i}.`);
         }
 
-        const alvo = h.feito ? h.alvo : inf.alvoAfinar;
-        const desvio = A.cents(alvo, pl.alvos[i + 1]);
-        let alvoInfo = i < 5
-          ? `${sinal(desvio)} cents em relação à nota final: os furos de cima ainda não existem e, quando feitos, mudam um pouco esta nota.`
-          : 'Este é o último furo: afine direto na nota final.';
-        if (!h.feito && inf.erro) alvoInfo += ` A posição já inclui a correção de ${sinal(inf.erro)} cents medida no passo anterior.`;
+        const alvoInfo = !h.feito && inf.erro ? `A posição já inclui a correção de ${sinal(inf.erro)} cents medida no passo anterior.` : '';
         const broca = Math.max(3, arred05(diam - 2));
         return {
           nota: nomeGrau(pl, i + 1),
@@ -529,7 +509,7 @@
           avisos: (inf.afastado && !h.feito
             ? `<p class="ajuda">Diâmetro ajustado para manter pelo menos ${VAO_MIN} mm entre os furos ${Math.min(i + 1, inf.afastado)} e ${Math.max(i + 1, inf.afastado)}.</p>`
             : '') + avisos.map((a) => `<p class="aviso">${a}</p>`).join(''),
-          alvo: `${nomeGrau(pl, i + 1)} ${sinal(desvio)}¢ · ${hz(alvo)}`,
+          alvo: `${nomeGrau(pl, i + 1)} · ${hz(pl.alvos[i + 1])}`,
           alvoInfo,
           feitoInfo: `Furo a ${mm(h.pos, 1)} com ${mm(h.diam, 1)}. Diferença do modelo: ${sinal(h.erro)} cents.`,
           'ph:furo.posReal': fmt(pos, 1),
@@ -828,14 +808,14 @@
     compConfirmar() {
       const p = proj(), pl = plano();
       if (p.comprimento == null) { alert('Informe o comprimento final medido.'); return; }
-      const alvo = pl.alvoComp;
+      const alvo = pl.alvos[0];
       const geo = { ...pl.geo, comprimento: p.comprimento, furos: [], deltaEmb: 0 };
       const d = A.calibrarEmbocadura(geo, 0, alvo, pl.gas);
       if (d == null) {
         alert('Essa medida está muito longe do previsto pelo cálculo. Confira o comprimento e as medidas da embocadura.');
         return;
       }
-      Object.assign(p, { deltaEmb: d, alvoComp: alvo, compFeito: true });
+      Object.assign(p, { deltaEmb: d, compFeito: true });
       salvar();
       renderPasso();
     },
@@ -861,11 +841,11 @@
         alert(`O diâmetro ${fmt(diam, 1)} mm não é válido para este tubo.`);
         return;
       }
-      const alvo = pl.info[i].alvoAfinar;
+      const alvo = pl.alvos[i + 1];
       const furos = pl.geo.furos.slice(0, i + 1).map((f) => ({ ...f }));
       furos[i] = { pos, diam };
       const fModelo = A.ressonancia({ ...pl.geo, furos }, i + 1, pl.gas, alvo);
-      Object.assign(h, { pos, diam, alvo, erro: A.cents(fModelo, alvo), feito: true });
+      Object.assign(h, { pos, diam, erro: A.cents(fModelo, alvo), feito: true });
       salvar();
       renderPasso();
     },

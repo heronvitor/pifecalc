@@ -21,5 +21,3 @@ Para afinar, use um afinador cromático qualquer (aplicativo no celular, por exe
    com o tubo real.
 2. A cada furo confirmado, a diferença entre o modelo e a nota real (em cents) é aplicada
    ao cálculo dos furos seguintes (pode ser desligada).
-3. A nota-alvo mostrada durante a construção já desconta o efeito dos furos de cima, que
-   ainda não existem.
