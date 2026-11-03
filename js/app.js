@@ -195,7 +195,7 @@
       if (p.furos[i].feito) continue;
       const fF = A.ressonancia(geo, i + 1, gas, alvos[i + 1]);
       const fC = A.ressonancia({ ...geo, furos: geo.furos.slice(0, i + 1) }, i + 1, gas, alvos[i + 1]);
-      info[i].alvoAfinador = alvos[i + 1] * fC / fF;
+      info[i].alvoAfinar = alvos[i + 1] * fC / fF;
     }
     pl.margem = Math.max(10, 0.03 * geo.comprimento);
     pl.gomo = geo.rolha + geo.comprimento + pl.margem;
@@ -379,7 +379,7 @@
               <li><b>Oitava curta</b> (a de cima baixa): a embocadura está longe demais do nó. Ao alargar, puxe o furo para o lado do nó.</li>
               <li><b>Oitava larga</b> (a de cima alta): a embocadura está perto demais. Ao alargar, puxe o furo para o lado do pé.</li>
               <li>Com rolha em vez de nó, o ajuste é mais fácil: empurre a rolha para perto da embocadura (oitava curta) ou afaste-a (oitava larga).</li>
-              <li>O afinador diz quantos milímetros mover. Registre abaixo a distância final.</li>
+              <li>Registre abaixo a distância final.</li>
             </ul>
           </details>
           <h3>Como ficou</h3>
@@ -478,7 +478,7 @@
               <li>Meça no afinador a faixa do furo nas duas oitavas. Se a de cima sair baixa (oitava curta), faça o rebaixo.</li>
               <li>Rebaixo: com lima redonda ou estilete, chanfre por dentro a borda do furo, abrindo em funil para o lado de dentro do tubo. O diâmetro de fora não muda.</li>
               <li>O rebaixo sobe as duas oitavas, mas a de cima sobe mais. Faça antes de a nota de baixo chegar ao alvo e termine alargando por fora.</li>
-              <li>Vá aos poucos e meça de novo: o afinador avisa quando a oitava ficar justa.</li>
+              <li>Vá aos poucos e meça de novo até a oitava ficar justa.</li>
               <li>Paredes grossas e furos pequenos são os que mais pedem rebaixo.</li>
             </ul>
           </details>
@@ -513,7 +513,7 @@
           else if (i !== 3 && vao > VAO_MAX_DEDOS) avisos.push(`${mm(vao)} até o furo ${i} pode ser longe para os dedos. Para aproximar, aumente o diâmetro deste furo ou diminua o do furo ${i}.`);
         }
 
-        const alvo = h.feito ? h.alvo : inf.alvoAfinador;
+        const alvo = h.feito ? h.alvo : inf.alvoAfinar;
         const desvio = A.cents(alvo, pl.alvos[i + 1]);
         let alvoInfo = i < 5
           ? `${sinal(desvio)} cents em relação à nota final: os furos de cima ainda não existem e, quando feitos, mudam um pouco esta nota.`
@@ -766,7 +766,6 @@
       }
     }
     $$('#passos button').forEach((b, k) => b.classList.toggle('feito', k > 0 && passoFeito(p, k)));
-    atualizarAlvoAfinador();
   }
 
   let espera = null;
@@ -862,7 +861,7 @@
         alert(`O diâmetro ${fmt(diam, 1)} mm não é válido para este tubo.`);
         return;
       }
-      const alvo = pl.info[i].alvoAfinador;
+      const alvo = pl.info[i].alvoAfinar;
       const furos = pl.geo.furos.slice(0, i + 1).map((f) => ({ ...f }));
       furos[i] = { pos, diam };
       const fModelo = A.ressonancia({ ...pl.geo, furos }, i + 1, pl.gas, alvo);
@@ -965,223 +964,6 @@
     renderPasso();
   });
 
-  // ---------- afinador ----------
-  const af = new window.Afinador(mostrarLeitura);
-
-  function alvoAfinador() {
-    const p = proj(), s = PASSOS[p.passo], pl = plano();
-    if (pl.falhou) return null;
-    if (s.id === 'comp') return { f: p.compFeito ? p.alvoComp : pl.alvoComp, nome: nomeGrau(pl, 0), aberto: 0 };
-    if (s.id === 'furo') {
-      const h = p.furos[s.i];
-      return { f: h.feito ? h.alvo : pl.info[s.i].alvoAfinador, nome: nomeGrau(pl, s.i + 1), aberto: s.i + 1 };
-    }
-    return null;
-  }
-
-  // Faixa de sopro: cents das leituras estáveis em relação à referência,
-  // do mais grave ao mais agudo (sopro e embocadura). O centro é o que se compara ao alvo.
-  // O 2º modo (oitava de cima) tem a sua faixa, medida em relação ao dobro da referência.
-  const FAIXA_LIM = 150; // ¢ — além disso é outro harmônico ou outra nota
-  const FAIXA_ESC = 100; // ¢ — meia largura da barra
-  const faixa = { ref: null, comAlvo: false, cents: [], cents2: [] };
-
-  // 1 = perto da referência, 2 = perto da oitava, 0 = outra coisa
-  function modoFaixa(c) {
-    return Math.abs(c) <= FAIXA_LIM ? 1 : Math.abs(c - 1200) <= FAIXA_LIM ? 2 : 0;
-  }
-
-  function percentil(v, q) {
-    const s = [...v].sort((a, b) => a - b);
-    return s[Math.min(s.length - 1, Math.max(0, Math.round(q * (s.length - 1))))];
-  }
-
-  function zerarFaixa(ref = null, comAlvo = false) {
-    faixa.ref = ref;
-    faixa.comAlvo = comAlvo;
-    faixa.cents = [];
-    faixa.cents2 = [];
-    mostrarFaixa();
-  }
-
-  const classeCents = (c) => Math.abs(c) <= 5 ? 'afinado' : Math.abs(c) <= 20 ? 'perto' : 'longe';
-
-  // Desenha uma barra de faixa e devolve o centro (ou null se ainda não há leituras).
-  function desenharFaixa(v, cheia, meio, txt, vazio) {
-    const pos = (c) => `${50 + 50 * Math.max(-1, Math.min(1, c / FAIXA_ESC))}%`;
-    if (v.length < 10) {
-      cheia.style.opacity = meio.style.opacity = '0';
-      txt.innerHTML = vazio;
-      txt.className = 'af-faixa-txt';
-      return null;
-    }
-    const lo = percentil(v, 0.05), hi = percentil(v, 0.95), c = (lo + hi) / 2;
-    cheia.style.opacity = '1';
-    cheia.style.left = pos(lo);
-    cheia.style.width = `calc(${pos(hi)} - ${pos(lo)})`;
-    meio.style.opacity = '1';
-    meio.style.left = pos(c);
-    txt.innerHTML = `Faixa ${sinal(Math.round(lo))} a ${sinal(Math.round(hi))}¢ · largura ${Math.round(hi - lo)}¢<br>`
-      + `Centro <b>${sinal(Math.round(c))} cents</b>`;
-    txt.className = 'af-faixa-txt ' + classeCents(c);
-    return c;
-  }
-
-  function mostrarFaixa() {
-    const c1 = desenharFaixa(faixa.cents, $('#afFaixaCheia'), $('#afFaixaMeio'), $('#afFaixaTxt'),
-      'Faça a nota o mais grave e o mais aguda que conseguir, mudando a força do sopro e a embocadura, sem deixar a nota quebrar. Repita 2 ou 3 vezes.');
-    const c2 = desenharFaixa(faixa.cents2, $('#afFaixa2Cheia'), $('#afFaixa2Meio'), $('#afFaixa2Txt'),
-      'Sopre mais forte para a nota subir uma oitava e faça o mesmo: o mais grave e o mais aguda possível.');
-    const oit = $('#afOitava');
-    if (c1 === null || c2 === null) {
-      oit.innerHTML = '';
-      oit.className = 'af-faixa-txt';
-      return;
-    }
-    // Os dois centros já são cents em relação a ref e 2·ref: a diferença é o desvio da oitava.
-    const d = Math.round(c2 - c1);
-    const como = Math.abs(d) <= 5 ? 'oitava justa' : d > 0 ? 'oitava larga: a de cima está alta' : 'oitava curta: a de cima está baixa';
-    const conselho = conselhoOitava(d);
-    oit.innerHTML = `2º modo em relação ao dobro do 1º: <b>${sinal(d)} cents</b><br>${como}`
-      + (conselho ? `<br><span class="af-conselho">${conselho}</span>` : '');
-    oit.className = 'af-faixa-txt ' + classeCents(d);
-  }
-
-  const OITAVA_TOL = 10; // ¢ — abaixo disso, não vale mexer no bambu
-
-  // Quanto a oitava (tubo sem furos) muda por mm de distância nó → embocadura, pelo modelo.
-  function sensibilidadeRolha(pl) {
-    if (pl.sensRolha === undefined) {
-      const oit = (rolha) => {
-        const geo = { ...pl.geo, rolha, furos: [] };
-        const f1 = A.ressonancia(geo, 0, pl.gas, pl.alvos[0]);
-        return A.cents(A.ressonancia(geo, 0, pl.gas, pl.alvos[0], 2), 2 * f1);
-      };
-      const r = pl.geo.rolha, s = (oit(r + 2) - oit(Math.max(2, r - 2))) / (r + 2 - Math.max(2, r - 2));
-      pl.sensRolha = isFinite(s) && s < 0 ? s : null;
-    }
-    return pl.sensRolha;
-  }
-
-  function conselhoOitava(d) {
-    if (Math.abs(d) < OITAVA_TOL) return '';
-    const p = proj(), s = PASSOS[p.passo], pl = plano();
-    if (pl.falhou) return '';
-    const curta = d < 0;
-    if (s.id === 'emb' || s.id === 'comp') {
-      const sens = sensibilidadeRolha(pl);
-      const mover = sens ? Math.min(15, Math.max(0.5, arred05(Math.abs(d / sens)))) : null;
-      const quanto = mover ? ` cerca de ${mm(mover, 1)}` : '';
-      if (s.id === 'emb') {
-        if (mover > 3) {
-          return `${curta ? 'Aproxime a embocadura do nó' : 'Afaste a embocadura do nó'}${quanto}. É mais do que dá para puxar alargando: `
-            + 'feche o piloto (cola com serragem do próprio bambu) e fure de novo no lugar novo.';
-        }
-        return curta
-          ? `Aproxime a embocadura do nó${quanto}: ao alargar, puxe o furo para o lado do nó.`
-          : `Afaste a embocadura do nó${quanto}: ao alargar, puxe o furo para o lado do pé.`;
-      }
-      return curta
-        ? `A câmara do nó está grande: empurre a rolha${quanto} para perto da embocadura (ou encoste cera no nó). Depois confira a nota de novo.`
-        : `A câmara do nó está curta: afaste a rolha${quanto}. Com nó natural não há como aumentar; fica para o próximo pífano (embocadura mais longe do nó).`;
-    }
-    if (s.id === 'furo') {
-      return curta
-        ? 'Faça o rebaixo (undercut) neste furo: chanfre a borda por dentro. Ele sobe mais a oitava de cima. Pare antes de a nota de baixo chegar ao alvo.'
-        : 'Não faça rebaixo neste furo: ele subiria ainda mais a oitava de cima. Prefira terminar com o furo menor.';
-    }
-    return '';
-  }
-
-  function atualizarAlvoAfinador() {
-    if ($('#afinador').hidden) return;
-    const a = alvoAfinador();
-    if (a ? a.f !== faixa.ref : faixa.comAlvo) zerarFaixa(a ? a.f : null, !!a);
-    $('#afAlvo').innerHTML = a
-      ? `Alvo: <b>${a.nome} ${sinal(A.cents(a.f, plano().alvos[a.aberto]))}¢</b> · ${hz(a.f)}`
-      : 'Sem alvo nesta etapa: mostrando a nota mais próxima.';
-  }
-
-  function mostrarLeitura(r) {
-    const agulha = $('#afAgulha'), cents = $('#afCents');
-    const a = alvoAfinador();
-    if (!r) {
-      agulha.style.opacity = '0.2';
-      $('#afNota').textContent = '—';
-      $('#afHz').innerHTML = '&nbsp;';
-      cents.innerHTML = '&nbsp;';
-      cents.className = 'af-cents';
-      return;
-    }
-    const la4 = LA4;
-    const midi = 69 + 12 * Math.log2(r.f / la4);
-    const ref = a ? a.f : la4 * Math.pow(2, (Math.round(midi) - 69) / 12);
-    const cr = A.cents(r.f, ref);
-    const c = a && modoFaixa(cr) === 2 ? cr - 1200 : cr; // com alvo, a oitava de cima mira o dobro dele
-    $('#afNota').textContent = A.nomeMidi(midi);
-    $('#afHz').textContent = hz(r.f);
-    agulha.style.opacity = r.estavel ? '1' : '0.5';
-    agulha.style.left = `${50 + Math.max(-50, Math.min(50, c))}%`;
-    cents.textContent = `${sinal(c)} cents`;
-    cents.className = 'af-cents ' + classeCents(c);
-    // Sem alvo, a faixa se prende à primeira nota tocada e só recomeça
-    // quando o som se afasta dela (outra nota, não só um sopro mais forte ou a oitava).
-    if (!a && faixa.ref) {
-      const c0 = A.cents(r.f, faixa.ref);
-      if (Math.abs(c0 + 1200) <= FAIXA_LIM && !faixa.cents2.length) {
-        // começou pela oitava de cima: o que foi medido passa a ser o 2º modo
-        faixa.ref /= 2;
-        faixa.cents2 = faixa.cents;
-        faixa.cents = [];
-      } else if (!modoFaixa(c0)) zerarFaixa(ref);
-    }
-    if (!a && !faixa.ref) zerarFaixa(ref);
-    const cf = A.cents(r.f, faixa.ref || ref);
-    const modo = modoFaixa(cf);
-    if (r.estavel && modo) {
-      const v = modo === 1 ? faixa.cents : faixa.cents2;
-      v.push(modo === 1 ? cf : cf - 1200);
-      if (v.length > 3000) v.shift();
-      mostrarFaixa();
-    }
-  }
-
-  async function abrirAfinador() {
-    $('#afinador').hidden = false;
-    $('#abrirAfinador').hidden = true;
-    atualizarAlvoAfinador();
-    $('#afMsg').textContent = 'Afine pelo centro da faixa, não pela leitura de um sopro só.';
-    zerarFaixa(faixa.comAlvo ? faixa.ref : null, faixa.comAlvo);
-    try {
-      await af.iniciar();
-    } catch (err) {
-      $('#afMsg').textContent = err.name === 'NotAllowedError'
-        ? 'Sem permissão para usar o microfone. Libere nas configurações do navegador.'
-        : err.message || 'Não foi possível abrir o microfone.';
-    }
-  }
-
-  function fecharAfinador() {
-    af.parar();
-    af.pararTom();
-    $('#afTom').textContent = '▶ Ouvir alvo';
-    $('#afinador').hidden = true;
-    $('#abrirAfinador').hidden = false;
-  }
-
-  $('#abrirAfinador').addEventListener('click', abrirAfinador);
-  $('#fecharAfinador').addEventListener('click', fecharAfinador);
-  $('#afZerar').addEventListener('click', () => zerarFaixa(faixa.comAlvo ? faixa.ref : null, faixa.comAlvo));
-  $('#afTom').addEventListener('click', () => {
-    if (af.tocando) {
-      af.pararTom();
-      $('#afTom').textContent = '▶ Ouvir alvo';
-    } else {
-      const a = alvoAfinador();
-      af.tocar(a ? a.f : plano().alvos[0]);
-      $('#afTom').textContent = '■ Parar';
-    }
-  });
   // ---------- início ----------
   renderProjetos();
   renderPasso();
